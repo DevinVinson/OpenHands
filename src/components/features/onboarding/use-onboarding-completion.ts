@@ -1,4 +1,5 @@
 import React from "react";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 
 /**
  * localStorage key persisting whether the welcome onboarding flow has
@@ -22,6 +23,8 @@ function readCompletedFromStorage(): boolean {
 
 /**
  * Tracks whether the welcome onboarding modal has been completed.
+ * Onboarding sets the agent and LLM on the backend, so when the operator
+ * locked those settings the setup is theirs and counts as done.
  * The hook returns the current `isCompleted` flag plus an imperative
  * `markCompleted()` callback. State is mirrored to localStorage and
  * synced across tabs via the `storage` event.
@@ -40,6 +43,12 @@ export function useOnboardingCompletion() {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
+  const featurePolicy = useFeaturePolicy();
+  // @spec FP-006 — The operator prepared the agent and LLM; users skip setup.
+  const operatorOwnsSetup =
+    !featurePolicy.isEnabled("llmProfiles.manage") ||
+    !featurePolicy.isEnabled("agentProfiles.manage");
+
   const markCompleted = React.useCallback(() => {
     try {
       window.localStorage.setItem(ONBOARDING_COMPLETED_STORAGE_KEY, "1");
@@ -49,5 +58,8 @@ export function useOnboardingCompletion() {
     setIsCompleted(true);
   }, []);
 
-  return { isCompleted, markCompleted } as const;
+  return {
+    isCompleted: isCompleted || operatorOwnsSetup,
+    markCompleted,
+  } as const;
 }

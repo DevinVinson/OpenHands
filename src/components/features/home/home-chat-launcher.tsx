@@ -48,6 +48,7 @@ import { OpenLauncherButton } from "./open-launcher-button";
 import { OpenWorkspaceDialog } from "./open-workspace-dialog";
 import { OpenRepositoryDialog } from "./open-repository-dialog";
 import { HomeGitControlBarPreview } from "./home-git-control-bar-preview";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 
 export function HomeChatLauncher() {
   const { t } = useTranslation("openhands");
@@ -67,6 +68,8 @@ export function HomeChatLauncher() {
   );
   const [selectedPlugins, setSelectedPlugins] = useState<PluginSpec[]>([]);
   const [isPluginPickerOpen, setIsPluginPickerOpen] = useState(false);
+  // @spec FP-004 — Picking plugins for a new conversation is part of Plugins.
+  const canPickPlugins = useFeaturePolicy().isEnabled("customize.plugins");
   const [launcherMode, setLauncherMode] = useState<HomeLauncherMode>("code");
   const displayedLauncherMode = launcherMode;
   const isAutomateMode = launcherMode === "automate";
@@ -360,11 +363,13 @@ export function HomeChatLauncher() {
               disabledTooltip={workspacesUnsupportedMessage}
             />
           )}
-          <PluginPickerTrigger
-            count={selectedPlugins.length}
-            onClick={() => setIsPluginPickerOpen(true)}
-            disabled={isCreating || isAutomateMode}
-          />
+          {canPickPlugins && (
+            <PluginPickerTrigger
+              count={selectedPlugins.length}
+              onClick={() => setIsPluginPickerOpen(true)}
+              disabled={isCreating || isAutomateMode}
+            />
+          )}
         </div>
 
         <div className="mt-8 flex w-full flex-col gap-8">

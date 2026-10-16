@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createCommandMenuItems } from "#/components/features/command-menu/command-menu-items";
 import { OSS_NAV_ITEMS } from "#/constants/settings-nav";
+import type { FeatureId } from "#/feature-policy/feature-policy";
 
 /**
  * The automation entry's title, description, and keywords are the interface
@@ -85,5 +86,30 @@ describe("the command menu settings group", () => {
       "app-settings",
       "toggle-sidebar",
     ]);
+  });
+});
+
+// @spec FP-004 — The command menu does not reach pages the operator turned off
+describe("the command menu under an operator feature policy", () => {
+  it("omits entries for disabled pages and an empty Customize", () => {
+    // Arrange
+    const disabled = new Set<FeatureId>([
+      "llmProfiles.manage",
+      "customize.mcp",
+    ]);
+
+    // Act
+    const ids = createCommandMenuItems({
+      toggleSidebar: vi.fn(),
+      featurePolicy: { isEnabled: (id) => !disabled.has(id) },
+      hasCustomizeSection: false,
+    }).map((item) => item.id);
+
+    // Assert
+    expect(ids).not.toContain("llm-settings");
+    expect(ids).not.toContain("meta-llm-settings");
+    expect(ids).not.toContain("mcp");
+    expect(ids).not.toContain("customize");
+    expect(ids).toContain("agent-settings");
   });
 });

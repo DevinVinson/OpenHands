@@ -588,6 +588,51 @@ describe("static-server.mjs", () => {
     });
   });
 
+  // @spec FP-001 — Single policy source
+  describe("feature policy injection", () => {
+    it("reads the policy from AGENT_CANVAS_FEATURES", () => {
+      const config = parseArgs([], {
+        AGENT_CANVAS_FEATURES: '{"version":1,"disabled":["workspaces.add"]}',
+      });
+      expect(config.featurePolicy).toEqual({
+        version: 1,
+        disabled: ["workspaces.add"],
+      });
+    });
+
+    it("exposes the policy on window.__AGENT_CANVAS_FEATURE_POLICY__", async () => {
+      const buildDir = mkdtempSync(path.join(tmpdir(), "agent-canvas-build-"));
+      tempDirs.push(buildDir);
+      writeFileSync(
+        path.join(buildDir, "index.html"),
+        "<html><head></head><body>app</body></html>",
+      );
+
+      const origin = await startServer(buildDir, {
+        featurePolicy: { version: 1, disabled: ["backends.switch"] },
+      });
+      const body = await (await fetch(`${origin}/conversations`)).text();
+
+      expect(body).toContain(
+        'window.__AGENT_CANVAS_FEATURE_POLICY__={"version":1,"disabled":["backends.switch"]}',
+      );
+    });
+
+    it("does not inject a policy when none is configured", async () => {
+      const buildDir = mkdtempSync(path.join(tmpdir(), "agent-canvas-build-"));
+      tempDirs.push(buildDir);
+      writeFileSync(
+        path.join(buildDir, "index.html"),
+        "<html><head></head><body>app</body></html>",
+      );
+
+      const origin = await startServer(buildDir);
+      const body = await (await fetch(`${origin}/`)).text();
+
+      expect(body).not.toContain("__AGENT_CANVAS_FEATURE_POLICY__");
+    });
+  });
+
   describe("session key injection", () => {
     async function startServerWithKey(dir: string, sessionApiKey: string) {
       const server = await startStaticServer({

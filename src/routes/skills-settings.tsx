@@ -36,6 +36,7 @@ import {
 } from "#/utils/extension-module-card-classes";
 import { settingsLikeMainScrollClassName } from "#/utils/settings-like-page-layout-classes";
 import { cn } from "#/utils/utils";
+import { RequireFeature } from "./require-feature";
 
 const SEARCH_URL_SYNC_DELAY_MS = 300;
 
@@ -288,4 +289,10 @@ function SkillsSettingsScreen() {
   );
 }
 
-export default SkillsSettingsScreen;
+export default function SkillsSettingsRoute() {
+  return (
+    <RequireFeature feature="customize.skills">
+      <SkillsSettingsScreen />
+    </RequireFeature>
+  );
+}

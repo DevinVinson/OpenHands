@@ -26,6 +26,7 @@ import {
 import { NavigationLink } from "#/components/shared/navigation-link";
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
 import { useConversationStore } from "#/stores/conversation-store";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 import { AddBackendModal } from "./add-backend-modal";
 import { BackendStatusDot } from "./backend-status-dot";
 import { ManageBackendsModal } from "./manage-backends-modal";
@@ -150,6 +151,7 @@ export function BackendSelector({
 }: BackendSelectorProps = {}) {
   const { t } = useTranslation("openhands");
   const { backends, active, setActive } = useActiveBackendContext();
+  const featurePolicy = useFeaturePolicy();
   const cloudOrgs = useAllCloudOrganizations();
   const currentUserIds = useCloudCurrentUserId();
   // Probe each registered backend every 10s.
@@ -165,27 +167,32 @@ export function BackendSelector({
 
   const personalWorkspaceLabel = t(I18nKey.BACKEND$PERSONAL_WORKSPACE);
 
-  const options = React.useMemo(
-    () =>
-      buildOptions(
-        backends,
-        personalWorkspaceLabel,
-        cloudOrgs,
-        currentUserIds,
-        healthByBackendId,
-      ),
-    [
+  const activeValue = makeOptionValue(active.backend.id, active.orgId);
+  // @spec FP-004 — With switching off, the menu lists only the active backend.
+  const canSwitchBackend = featurePolicy.isEnabled("backends.switch");
+  const options = React.useMemo(() => {
+    const all = buildOptions(
       backends,
       personalWorkspaceLabel,
       cloudOrgs,
       currentUserIds,
       healthByBackendId,
-    ],
-  );
+    );
+    return canSwitchBackend
+      ? all
+      : all.filter((option) => option.value === activeValue);
+  }, [
+    backends,
+    personalWorkspaceLabel,
+    cloudOrgs,
+    currentUserIds,
+    healthByBackendId,
+    canSwitchBackend,
+    activeValue,
+  ]);
 
   const noBackendSelected = isNoBackend(active.backend);
   const noBackendLabel = t(I18nKey.BACKEND$NO_BACKEND_AVAILABLE);
-  const activeValue = makeOptionValue(active.backend.id, active.orgId);
   const activeOption = noBackendSelected
     ? undefined
     : options.find((o) => o.value === activeValue);
@@ -231,7 +238,8 @@ export function BackendSelector({
   // A cookie-auth (OHE-hosted) Canvas has nothing to add, manage, or
   // reconnect — its single locked backend is owned by the main-app session.
   const hideBackendFooter =
-    isLockedToCloud && active.backend.authMode === "cookie";
+    (isLockedToCloud && active.backend.authMode === "cookie") ||
+    !featurePolicy.isEnabled("backends.manage");
 
   const preventDropdownMenuClose = React.useCallback(
     (event: React.SyntheticEvent<HTMLButtonElement>) => {

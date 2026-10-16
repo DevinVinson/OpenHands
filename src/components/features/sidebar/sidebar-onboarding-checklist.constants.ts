@@ -3,6 +3,7 @@ import type {
   OnboardingLinkDestinationType,
   OnboardingLinkId,
 } from "#/hooks/use-tracking";
+import type { FeatureId } from "#/feature-policy/feature-policy";
 
 const SCHEDULED_TASKS_DOCS_URL =
   "https://docs.openhands.dev/openhands/usage/agent-canvas/prebuilt-automations";
@@ -51,6 +52,15 @@ export const SIDEBAR_ONBOARDING_CHECKLIST_ROUTES: Record<
   "start-conversation": "/conversations",
   "schedule-task": "/automations",
   "customize-agent": "/settings/agents",
+};
+
+/** Operator feature whose page an item links to; off hides the item. */
+export const SIDEBAR_ONBOARDING_CHECKLIST_FEATURES: Partial<
+  Record<SidebarOnboardingChecklistItemId, FeatureId>
+> = {
+  "configure-llm": "llmProfiles.manage",
+  "customize-agent": "agentProfiles.manage",
+  "connect-mcp": "customize.mcp",
 };
 
 /** Semantic `link_id` values for `onboarding_link_clicked` (no `open_docs`). */

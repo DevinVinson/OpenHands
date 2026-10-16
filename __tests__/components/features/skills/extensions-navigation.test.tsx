@@ -12,6 +12,7 @@ import {
   setRegisteredBackends,
 } from "#/api/backend-registry/active-store";
 import type { Backend } from "#/api/backend-registry/types";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 import {
   ExtensionsNavigation,
@@ -129,6 +130,25 @@ describe("ExtensionsNavigation", () => {
       "href",
       "/apps",
     );
+  });
+
+  // @spec FP-004 — Customize lists only the sections the operator left on
+  it("omits sections the operator turned off", () => {
+    renderExtensionsNavigation(
+      <FeaturePolicyProvider
+        policy={{ version: 1, disabled: ["customize.plugins"] }}
+      >
+        <ExtensionsNavigation />
+      </FeaturePolicyProvider>,
+    );
+
+    const nav = screen.getByTestId("extensions-navbar-desktop");
+    expect(
+      within(nav).queryByTestId("sidebar-extensions-/plugins"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(nav).getByTestId("sidebar-extensions-/mcp"),
+    ).toBeInTheDocument();
   });
 
   it("renders the Plugins item as a live link without a Coming Soon badge", () => {

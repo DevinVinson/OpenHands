@@ -8,6 +8,7 @@ import { useCanManageOrgProfiles } from "#/hooks/use-can-manage-org-profiles";
 import { useSwitchLlmProfileAndLog } from "#/hooks/mutation/use-switch-llm-profile-and-log";
 import { SWITCH_LLM_PROFILE_MUTATION_KEY } from "#/hooks/mutation/use-switch-llm-profile";
 import { useModelStore } from "#/stores/model-store";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 
 export interface ChatInputLlmProfileState {
   profiles: ProfileInfo[];
@@ -43,6 +44,7 @@ export function useChatInputLlmProfileState(): ChatInputLlmProfileState {
   const { data: conversation } = useActiveConversation();
   const { data, isLoading } = useLlmProfiles();
   const canManageOrgProfiles = useCanManageOrgProfiles();
+  const featurePolicy = useFeaturePolicy();
   const { switchAndLog } = useSwitchLlmProfileAndLog();
   // Read the switch's pending state globally by mutation key: the pill button
   // and the menu that fires the switch are separate hook instances, so a
@@ -87,8 +89,11 @@ export function useChatInputLlmProfileState(): ChatInputLlmProfileState {
   // /switch_profile would 404. Either way the pill still names the active
   // profile; only the selectable rows drop out.
   const isTaskRoute = conversationId?.startsWith("task-") ?? false;
+  // @spec FP-004 — An operator lock keeps the pill naming the active profile.
   const canSwitchProfile =
-    !isTaskRoute && (!!conversationId || canManageOrgProfiles);
+    featurePolicy.isEnabled("llmProfiles.switch") &&
+    !isTaskRoute &&
+    (!!conversationId || canManageOrgProfiles);
 
   const selectProfile = useCallback(
     (profileName: string) => {

@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WorkspaceDropdown } from "../../../../src/components/features/home/workspace-dropdown/workspace-dropdown";
 import type { LocalWorkspace, LocalWorkspaceParent } from "#/types/workspace";
+import type { FeatureId } from "#/feature-policy/feature-policy";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -286,4 +288,47 @@ describe("WorkspaceDropdown empty state", () => {
       expect(screen.getByTestId("add-workspaces-button")).toBeVisible();
     },
   );
+});
+
+// @spec FP-004 — Workspace add and manage under an operator policy
+describe("WorkspaceDropdown feature policy", () => {
+  function renderWithPolicy(disabled: FeatureId[]) {
+    render(
+      <FeaturePolicyProvider policy={{ version: 1, disabled }}>
+        <WorkspaceDropdown
+          workspaces={GROUPED_WORKSPACES}
+          parents={PARENTS}
+          value={null}
+          onChange={vi.fn()}
+          onAddClick={vi.fn()}
+          onManageClick={vi.fn()}
+        />
+      </FeaturePolicyProvider>,
+    );
+  }
+
+  it("keeps workspace selection but drops Add Workspace when adding is off", async () => {
+    const user = userEvent.setup();
+    renderWithPolicy(["workspaces.add"]);
+    const menu = await openMenu(user);
+
+    expect(within(menu).getByText("alpha")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("add-workspaces-button"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("manage-workspaces-button")).toBeVisible();
+  });
+
+  it("renders no footer when adding and managing are both off", async () => {
+    const user = userEvent.setup();
+    renderWithPolicy(["workspaces.add", "workspaces.manage"]);
+    await openMenu(user);
+
+    expect(
+      screen.queryByTestId("add-workspaces-button"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("manage-workspaces-button"),
+    ).not.toBeInTheDocument();
+  });
 });

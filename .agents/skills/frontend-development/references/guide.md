@@ -18,6 +18,32 @@ Public skills are loaded from the `@openhands/extensions` npm package at build t
 Bundled catalog skills use the persisted `enabled_skills` allow-list defaulted from `DEFAULT_ENABLED_SKILL_NAMES`. User and project skills remain enabled unless listed in `disabled_skills`. Keep this logic centralized in `src/utils/skill-enablement.ts`. The Agent Server no longer clones the extensions repository or uses `EXTENSIONS_REF` for public skills.
 
 
+## Operator feature policy
+
+An operator can turn Canvas features off at startup (`AGENT_CANVAS_FEATURES` /
+`AGENT_CANVAS_FEATURES_FILE`; see `specs/canvas-feature-policy.md`). Gate a
+feature through one API:
+
+```ts
+const featurePolicy = useFeaturePolicy();
+if (!featurePolicy.isEnabled("backends.switch")) …
+```
+
+- Write the feature ID as a string literal at the call site, including
+  `feature: "<id>"` fields on nav or menu items. IDs are typed by `FeatureId`
+  (a Rule 3 union below), so `grep -rn '"workspaces.add"' src` lists every gate.
+- Gate a capability once, where it is already decided (e.g. `canSwitchProfile`
+  in `use-chat-input-llm-profile-state.ts`), not on each button. How a disabled
+  feature looks is the feature's choice; it must leave no working path and no
+  empty menu behind.
+- Wrap a route component in `RequireFeature` (`src/routes/require-feature.tsx`)
+  to render not-found when its feature is off.
+- Adding an ID: add it to `config/features.json` (the launcher validates against
+  it) and to `FEATURE_IDS` in `src/feature-policy/feature-policy.ts`; a contract
+  test keeps the two equal.
+- Say "feature policy", not "feature flag": Cloud's server-sent
+  `WebClientFeatureFlags` is a different thing.
+
 ## Workspace files
 
 Local Files discovery preferences belong to `misc_settings.app_preferences.workspace_file_discovery`, keyed by working directory on the active backend. `useWorkspaceFileDiscovery` reads the settings cache and saves sparse workspace patches. Preserve default exclusions and the 2,000-file cap when no configuration exists. Fetch one extra result to distinguish truncation from an exact-size list. Cloud keeps its server-side listing contract without these controls. See `specs/workspace-file-discovery.md`.

@@ -46,15 +46,15 @@ Every feature is on unless its ID appears in `disabled`. With no configuration, 
   | ID | Disables |
   | --- | --- |
   | `backends.switch` | Selecting a different backend. |
-  | `backends.manage` | Adding, editing, and removing backends, including the add-backend onboarding step. |
+  | `backends.manage` | Adding, editing, and removing backends. |
   | `workspaces.add` | Adding workspaces, including folder browsing. |
-  | `workspaces.manage` | Renaming and removing workspaces. |
-  | `llmProfiles.switch` | Changing the LLM profile for a conversation. |
+  | `workspaces.manage` | Removing workspaces. |
+  | `llmProfiles.switch` | Changing the LLM profile from the chat input. |
   | `llmProfiles.manage` | LLM and meta-LLM settings pages. |
   | `agentProfiles.switch` | Choosing an agent profile when starting a conversation. |
-  | `agentProfiles.manage` | Agent profile settings page. |
+  | `agentProfiles.manage` | Agent profile settings pages. |
   | `customize.skills` | Customize > Skills. |
-  | `customize.plugins` | Customize > Plugins. |
+  | `customize.plugins` | Customize > Plugins, and picking plugins for a new conversation. |
   | `customize.mcp` | Customize > MCP. |
   | `customize.apps` | Customize > Apps and extension pages. |
 

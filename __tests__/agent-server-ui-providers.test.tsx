@@ -23,6 +23,7 @@ import {
   setQueryClient,
 } from "#/index";
 import i18n from "#/i18n";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 
 const telemetryProviderMock = vi.hoisted(() => vi.fn());
 vi.mock("#/components/providers/telemetry-provider", () => ({
@@ -209,6 +210,28 @@ describe("AgentServerUIProviders", () => {
         },
       }),
     );
+  });
+
+  // @spec FP-001 — Embedded hosts supply the policy through the providers
+  it("applies a host-supplied feature policy to its children", () => {
+    function PluginsAvailability() {
+      const featurePolicy = useFeaturePolicy();
+      return (
+        <span data-testid="plugins-enabled">
+          {String(featurePolicy.isEnabled("customize.plugins"))}
+        </span>
+      );
+    }
+
+    render(
+      <AgentServerUIProviders
+        featurePolicy={{ version: 1, disabled: ["customize.plugins"] }}
+      >
+        <PluginsAvailability />
+      </AgentServerUIProviders>,
+    );
+
+    expect(screen.getByTestId("plugins-enabled")).toHaveTextContent("false");
   });
 
   it("wraps children in a scoped, customizable style root by default", () => {

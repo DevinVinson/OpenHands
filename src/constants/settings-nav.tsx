@@ -3,6 +3,7 @@ import KeyIcon from "#/icons/key.svg?react";
 import MemoryIcon from "#/icons/memory_icon.svg?react";
 import CircuitIcon from "#/icons/u-circuit.svg?react";
 import RobotIcon from "#/icons/u-robot.svg?react";
+import type { FeatureId } from "#/feature-policy/feature-policy";
 
 export interface SettingsNavItem {
   icon: React.ReactElement;
@@ -10,6 +11,8 @@ export interface SettingsNavItem {
   text: string;
   /** Short grey subline under the page title (`settings.tsx`). */
   subtitle: string;
+  /** Operator feature that must be on for this page to be listed or reachable. */
+  feature?: FeatureId;
 }
 
 export const OSS_NAV_ITEMS: SettingsNavItem[] = [
@@ -22,18 +25,21 @@ export const OSS_NAV_ITEMS: SettingsNavItem[] = [
     to: "/settings/agents",
     text: "SETTINGS$NAV_AGENT",
     subtitle: "SETTINGS$PAGE_AGENT_PROFILES_SUBLINE",
+    feature: "agentProfiles.manage",
   },
   {
     icon: <CircuitIcon width={16} height={16} />,
     to: "/settings/llm",
     text: "SETTINGS$NAV_LLM",
     subtitle: "SETTINGS$PAGE_LLM_SUBLINE",
+    feature: "llmProfiles.manage",
   },
   {
     icon: <RouteIcon className="size-4" strokeWidth={2} aria-hidden />,
     to: "/settings/meta-llm",
     text: "SETTINGS$NAV_META_LLM",
     subtitle: "SETTINGS$PAGE_META_LLM_SUBLINE",
+    feature: "llmProfiles.manage",
   },
   {
     icon: <MemoryIcon width={16} height={16} />,

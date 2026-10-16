@@ -17,6 +17,8 @@ import {
   createCommandMenuItems,
   getCommandMenuShortcutKey,
 } from "./command-menu-items";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
+import { getEnabledExtensionNavItems } from "#/components/features/skills/extensions-navigation";
 
 const COMMAND_MENU_SEARCH_INPUT_ID = "command-menu-search";
 const COMMAND_MENU_LISTBOX_ID = "command-menu-results";
@@ -110,12 +112,17 @@ export function CommandMenu() {
     };
   }, [isOpen]);
 
+  const featurePolicy = useFeaturePolicy();
+  const hasCustomizeSection =
+    getEnabledExtensionNavItems(featurePolicy).length > 0;
   const items = React.useMemo(
     () =>
       createCommandMenuItems({
         toggleSidebar: () => useSidebarStore.getState().toggleCollapsed(),
+        featurePolicy,
+        hasCustomizeSection,
       }),
-    [],
+    [featurePolicy, hasCustomizeSection],
   );
 
   const filteredItems = React.useMemo(

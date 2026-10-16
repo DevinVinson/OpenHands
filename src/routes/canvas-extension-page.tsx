@@ -4,8 +4,9 @@ import { useTranslation } from "react-i18next";
 import { LoadingSpinner } from "#/components/shared/loading-spinner";
 import { useCanvasExtensionsRuntime } from "#/components/features/canvas-extensions/canvas-extensions-runtime";
 import { I18nKey } from "#/i18n/declaration";
+import { RequireFeature } from "./require-feature";
 
-export default function CanvasExtensionPage() {
+function CanvasExtensionPageContent() {
   const { t } = useTranslation("openhands");
   const params = useParams();
   const navigate = useNavigate();
@@ -105,5 +106,13 @@ export default function CanvasExtensionPage() {
     >
       <div ref={containerRef} className="min-h-full" />
     </main>
+  );
+}
+
+export default function CanvasExtensionPage() {
+  return (
+    <RequireFeature feature="customize.apps">
+      <CanvasExtensionPageContent />
+    </RequireFeature>
   );
 }

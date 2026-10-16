@@ -10,8 +10,10 @@ import { useLlmProfiles } from "#/hooks/query/use-llm-profiles";
 import { useLlmConfigured } from "#/hooks/use-llm-configured";
 import { parseMcpConfig } from "#/utils/mcp-config";
 import { getLockedCloudHost } from "#/api/agent-server-config";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 import {
   isCustomizeChecklistPath,
+  SIDEBAR_ONBOARDING_CHECKLIST_FEATURES,
   SIDEBAR_ONBOARDING_CHECKLIST_ITEM_IDS,
   type SidebarOnboardingChecklistItemId,
 } from "./sidebar-onboarding-checklist.constants";
@@ -118,18 +120,23 @@ export function useSidebarOnboardingChecklist() {
   // items link to, and "customize-agent" only completes by visiting one
   // (OHE-3457).
   const isLockedToCloud = getLockedCloudHost() !== null;
+  const featurePolicy = useFeaturePolicy();
 
   const items = useMemo(
     (): SidebarOnboardingChecklistItemState[] =>
-      SIDEBAR_ONBOARDING_CHECKLIST_ITEM_IDS.filter(
-        (id) =>
+      SIDEBAR_ONBOARDING_CHECKLIST_ITEM_IDS.filter((id) => {
+        const feature = SIDEBAR_ONBOARDING_CHECKLIST_FEATURES[id];
+        // @spec FP-004 — No checklist step points at a page that is off.
+        if (feature && !featurePolicy.isEnabled(feature)) return false;
+        return (
           !isLockedToCloud ||
-          (id !== "configure-llm" && id !== "customize-agent"),
-      ).map((id) => ({
+          (id !== "configure-llm" && id !== "customize-agent")
+        );
+      }).map((id) => ({
         id,
         isComplete: completionById[id],
       })),
-    [completionById, isLockedToCloud],
+    [completionById, featurePolicy, isLockedToCloud],
   );
 
   const completedCount = items.filter((item) => item.isComplete).length;

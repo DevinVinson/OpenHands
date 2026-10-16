@@ -14,9 +14,14 @@ import {
 import { I18nKey } from "#/i18n/declaration";
 import { useActiveBackendContext } from "#/contexts/active-backend-context";
 import { isNoBackend } from "#/api/backend-registry/active-store";
+import type { FeatureId } from "#/feature-policy/feature-policy";
+import {
+  type FeaturePolicyChecker,
+  useFeaturePolicy,
+} from "#/feature-policy/feature-policy-context";
 
 /** Only the Skills item points to a cloud-hosted page today. */
-const CLOUD_LINKED_EXTENSION_PATH = "/skills";
+export const CLOUD_LINKED_EXTENSION_PATH = "/skills";
 /** Backend-installed artifacts are not available on Cloud backends yet. */
 const CLOUD_HIDDEN_EXTENSION_PATHS = new Set(["/plugins", "/apps"]);
 
@@ -26,23 +31,28 @@ interface ExtensionNavItem {
   icon: React.ReactElement;
   end?: boolean;
   comingSoon?: boolean;
+  /** Operator feature that must be on for this section to be listed. */
+  feature: FeatureId;
 }
 
 export const EXTENSIONS_NAV_ITEMS: ExtensionNavItem[] = [
   {
     to: "/mcp",
+    feature: "customize.mcp",
     label: "MCP Servers",
     icon: <ServerProcessIcon width={16} height={16} />,
     end: true,
   },
   {
     to: "/skills",
+    feature: "customize.skills",
     label: "Skills",
     icon: <SkillsIcon width={16} height={16} aria-hidden="true" />,
     end: true,
   },
   {
     to: "/plugins",
+    feature: "customize.plugins",
     label: "Plugins",
     icon: (
       <svg
@@ -66,11 +76,36 @@ export const EXTENSIONS_NAV_ITEMS: ExtensionNavItem[] = [
   },
   {
     to: "/apps",
+    feature: "customize.apps",
     label: "Apps",
     icon: <Blocks width={16} height={16} aria-hidden="true" />,
     end: true,
   },
 ];
+
+/** Customize sections the operator left on, in navigation order. */
+export function getEnabledExtensionNavItems(
+  featurePolicy: FeaturePolicyChecker,
+): ExtensionNavItem[] {
+  return EXTENSIONS_NAV_ITEMS.filter((item) =>
+    featurePolicy.isEnabled(item.feature),
+  );
+}
+
+/**
+ * The Customize sections this backend supports and the operator left on.
+ * Shared by the desktop navigation, the mobile hub, and the hub redirect.
+ */
+export function useAvailableExtensionNavItems() {
+  const { active } = useActiveBackendContext();
+  const { backend } = active;
+  const featurePolicy = useFeaturePolicy();
+  const isCloudBackend = !isNoBackend(backend) && backend.kind === "cloud";
+  const items = getEnabledExtensionNavItems(featurePolicy).filter(
+    (item) => !(CLOUD_HIDDEN_EXTENSION_PATHS.has(item.to) && isCloudBackend),
+  );
+  return { items, isCloudBackend, backend };
+}
 
 export function ExtensionsNavigation() {
   const { t } = useTranslation("openhands");
@@ -93,15 +128,10 @@ export function ExtensionsNavigation() {
 
 function ExtensionsNavigationLinks() {
   const { t } = useTranslation("openhands");
-  const { active } = useActiveBackendContext();
-  const { backend } = active;
-  const isCloudBackend = !isNoBackend(backend) && backend.kind === "cloud";
+  const { items, isCloudBackend, backend } = useAvailableExtensionNavItems();
   return (
     <div className="flex flex-col gap-0.5 pt-0.5">
-      {EXTENSIONS_NAV_ITEMS.filter(
-        (item) =>
-          !(CLOUD_HIDDEN_EXTENSION_PATHS.has(item.to) && isCloudBackend),
-      ).map((item) => {
+      {items.map((item) => {
         const isCloudSkillsLink =
           item.to === CLOUD_LINKED_EXTENSION_PATH && isCloudBackend;
         const baseRow = (

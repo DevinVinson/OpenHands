@@ -30,6 +30,7 @@ import {
   extensionModuleEmptyStateClassName,
 } from "#/utils/extension-module-card-classes";
 import type { InstalledCanvasExtensionInfo } from "#/types/canvas-extension";
+import { RequireFeature } from "./require-feature";
 
 type PendingAction =
   | { type: "enable"; extension: InstalledCanvasExtensionInfo }
@@ -39,7 +40,7 @@ const CANVAS_EXTENSIONS_DOCS_URL =
   "https://docs.openhands.dev/openhands/usage/agent-canvas/canvas-extensions";
 
 // @spec WN-001 — Apps trust notice uses theme-aware warning feedback
-export default function CanvasExtensionsScreen() {
+function CanvasExtensionsScreenContent() {
   const { t } = useTranslation("openhands");
   const { backend } = useActiveBackend();
   const [showAddModal, setShowAddModal] = React.useState(false);
@@ -227,5 +228,13 @@ export default function CanvasExtensionsScreen() {
         />
       ) : null}
     </div>
+  );
+}
+
+export default function CanvasExtensionsScreen() {
+  return (
+    <RequireFeature feature="customize.apps">
+      <CanvasExtensionsScreenContent />
+    </RequireFeature>
   );
 }

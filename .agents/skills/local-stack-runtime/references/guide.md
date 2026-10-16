@@ -7,6 +7,7 @@ Supported deployment environment variables:
 - `VITE_WORKING_DIR` — default workspace path sent when starting conversations.
 - `VITE_ENABLE_BROWSER_TOOLS=false` — start the agent-server with the browser tool set off (`OH_ENABLE_BROWSER=false`).
 - `VITE_BASE_PATH` — serve the SPA under a subpath such as `/canvas`; pair it with `scripts/static-server.mjs --base-path` at runtime.
+- `AGENT_CANVAS_FEATURES` / `AGENT_CANVAS_FEATURES_FILE` — operator feature policy (`{"version":1,"disabled":[…]}`, IDs in `config/features.json`). `scripts/feature-policy.mjs` validates it and throws on any error; `static-server.mjs` reads it from its environment and injects `window.__AGENT_CANVAS_FEATURE_POLICY__`, so every launcher that spawns it (npm CLI, dev:static, Docker, Electron) picks it up from the environment. Under the Vite dev server, `vite.config.ts` resolves the same variables into `__AGENT_CANVAS_DEV_FEATURE_POLICY__`. Docker copies `config/features.json` to `/opt/config/` because the flat `/opt/agent-canvas/feature-policy.mjs` imports `../config/features.json`.
 
 GitHub automation includes `.github/workflows/ci.yml` for `npm ci`, `npm test`, and `npm run build`, plus `.github/dependabot.yml` with weekly npm and GitHub Actions updates gated by a seven-day cooldown.
 

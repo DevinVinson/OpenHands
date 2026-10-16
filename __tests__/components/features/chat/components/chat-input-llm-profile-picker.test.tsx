@@ -1,6 +1,7 @@
 import { act, fireEvent, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithProviders } from "test-utils";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 const useChatInputLlmProfileStateMock = vi.fn();
 
@@ -161,6 +162,22 @@ describe("ChatInputLlmProfilePicker", () => {
     expect(
       screen.getByTestId("chat-input-llm-profile-current"),
     ).toHaveTextContent("OpenHands DeepSeek V4 Flash (free)");
+  });
+
+  // @spec FP-004 — No link to the LLM page when the operator turned it off
+  it("drops the LLM profiles settings link when LLM management is off", () => {
+    const { container } = renderWithProviders(
+      <FeaturePolicyProvider
+        policy={{ version: 1, disabled: ["llmProfiles.manage"] }}
+      >
+        <ChatInputLlmProfilePicker />
+      </FeaturePolicyProvider>,
+    );
+    fireEvent.click(screen.getByTestId("chat-input-llm-profile"));
+
+    expect(
+      container.ownerDocument.querySelector('a[href="/settings/llm"]'),
+    ).toBeNull();
   });
 
   it("links to the LLM profiles settings page", () => {

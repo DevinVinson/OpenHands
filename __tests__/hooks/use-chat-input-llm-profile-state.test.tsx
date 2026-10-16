@@ -36,16 +36,24 @@ vi.mock("#/hooks/use-can-manage-org-profiles", () => ({
 
 // eslint-disable-next-line import/first
 import { useChatInputLlmProfileState } from "#/hooks/use-chat-input-llm-profile-state";
+// eslint-disable-next-line import/first
+import type { FeatureId } from "#/feature-policy/feature-policy";
+// eslint-disable-next-line import/first
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 // The hook reads the switch's pending state via `useIsMutating`, which needs a
 // QueryClient in context (the switch mutation itself is mocked out above).
-const renderState = () => {
+const renderState = (disabled: FeatureId[] = []) => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return renderHook(() => useChatInputLlmProfileState(), {
     wrapper: ({ children }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <FeaturePolicyProvider policy={{ version: 1, disabled }}>
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      </FeaturePolicyProvider>
     ),
   });
 };
@@ -68,6 +76,17 @@ describe("useChatInputLlmProfileState", () => {
     useCanManageOrgProfilesMock.mockReset();
     // Local backends always own their profiles.
     useCanManageOrgProfilesMock.mockReturnValue(true);
+  });
+
+  // @spec FP-004 — An operator lock keeps the active profile named but fixed
+  it("names the active profile but refuses to switch when switching is off", () => {
+    const { result } = renderState(["llmProfiles.switch"]);
+
+    result.current.selectProfile("Smart");
+
+    expect(result.current.canSwitchProfile).toBe(false);
+    expect(result.current.currentProfileName).toBe("Fast");
+    expect(switchAndLog).not.toHaveBeenCalled();
   });
 
   it("prefers the profile stamped on the conversation over a model match", () => {

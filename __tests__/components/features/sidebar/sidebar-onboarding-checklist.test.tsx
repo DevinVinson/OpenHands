@@ -39,6 +39,8 @@ import {
 } from "#/context/navigation-context";
 import { I18nKey } from "#/i18n/declaration";
 import * as telemetry from "#/services/telemetry";
+import type { FeatureId } from "#/feature-policy/feature-policy";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 const mockUsePaginatedConversations = vi.fn();
 const mockUseAutomationHealth = vi.fn();
@@ -71,7 +73,10 @@ vi.mock("#/hooks/query/use-llm-profiles", () => ({
   useLlmProfiles: () => mockUseLlmProfiles(),
 }));
 
-function renderChecklist({ withSettingsSwitch = false } = {}) {
+function renderChecklist({
+  withSettingsSwitch = false,
+  disabled = [] as FeatureId[],
+} = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -87,8 +92,10 @@ function renderChecklist({ withSettingsSwitch = false } = {}) {
     ...render(
       <QueryClientProvider client={queryClient}>
         <NavigationProvider value={navigation}>
-          <SidebarOnboardingChecklist collapsed={false} />
-          {withSettingsSwitch ? <GettingStartedChecklistSwitch /> : null}
+          <FeaturePolicyProvider policy={{ version: 1, disabled }}>
+            <SidebarOnboardingChecklist collapsed={false} />
+            {withSettingsSwitch ? <GettingStartedChecklistSwitch /> : null}
+          </FeaturePolicyProvider>
         </NavigationProvider>
       </QueryClientProvider>,
     ),
@@ -165,6 +172,22 @@ describe("SidebarOnboardingChecklist", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(I18nKey.SIDEBAR$ONBOARDING_CHECKLIST_JOIN_SLACK),
+    ).toBeInTheDocument();
+  });
+
+  // @spec FP-004 — No checklist step points at a page the operator turned off
+  it("omits steps whose pages the operator turned off", () => {
+    renderChecklist({
+      disabled: ["llmProfiles.manage", "agentProfiles.manage", "customize.mcp"],
+    });
+
+    for (const id of ["configure-llm", "customize-agent", "connect-mcp"]) {
+      expect(
+        screen.queryByTestId(`sidebar-onboarding-checklist-item-${id}`),
+      ).not.toBeInTheDocument();
+    }
+    expect(
+      screen.getByTestId("sidebar-onboarding-checklist-item-schedule-task"),
     ).toBeInTheDocument();
   });
 

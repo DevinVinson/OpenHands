@@ -15,6 +15,7 @@ import { OSS_NAV_ITEMS } from "#/constants/settings-nav";
 import { ActiveBackendProvider } from "#/contexts/active-backend-context";
 import { MOCK_DEFAULT_USER_SETTINGS } from "#/mocks/handlers";
 import { queryClient } from "#/query-client-config";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 vi.mock("#/hooks/use-settings-nav-items", () => ({
   // Mirror the real navigation: LLM + Application (which the title test
@@ -136,6 +137,45 @@ describe("settings route", () => {
       expect(screen.getByTestId("app-settings-screen")).toBeInTheDocument();
     },
   );
+
+  // @spec FP-004 — A settings page whose feature is off is not reachable
+  it("sends a disabled settings page to the first listed page", async () => {
+    const RouterStub = createRoutesStub([
+      {
+        path: "/settings",
+        Component: SettingsScreen,
+        children: [
+          {
+            path: "/settings/agents",
+            Component: () => <div data-testid="agent-profiles-screen" />,
+          },
+          {
+            path: "/settings/llm",
+            Component: () => <div data-testid="llm-settings-screen" />,
+          },
+        ],
+      },
+    ]);
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ActiveBackendProvider>
+          <FeaturePolicyProvider
+            policy={{ version: 1, disabled: ["agentProfiles.manage"] }}
+          >
+            <RouterStub initialEntries={["/settings/agents"]} />
+          </FeaturePolicyProvider>
+        </ActiveBackendProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(
+      await screen.findByTestId("llm-settings-screen"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("agent-profiles-screen"),
+    ).not.toBeInTheDocument();
+  });
 
   it("exposes a single main landmark that holds the settings page", () => {
     // Arrange

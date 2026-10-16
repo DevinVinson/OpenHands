@@ -8,6 +8,7 @@ import { isSettingsPageHidden } from "#/utils/settings-utils";
 import { I18nKey } from "#/i18n/declaration";
 import { useActiveBackend } from "#/contexts/active-backend-context";
 import { getLockedCloudHost } from "#/api/agent-server-config";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 
 export type SettingsNavRenderedItem =
   | {
@@ -21,6 +22,7 @@ export function useSettingsNavItems(): SettingsNavRenderedItem[] {
   const { data: config } = useConfig();
   const { backend } = useActiveBackend();
   const featureFlags = config?.feature_flags;
+  const featurePolicy = useFeaturePolicy();
   // Locked-to-Cloud (SaaS / self-hosted OHE) lists only the Application page;
   // the OHE settings shell behind "All Cloud Settings" owns the rest (OHE-3168).
   const isLockedToCloud = getLockedCloudHost() !== null;
@@ -28,6 +30,7 @@ export function useSettingsNavItems(): SettingsNavRenderedItem[] {
   return OSS_NAV_ITEMS.filter(
     (item) =>
       !isSettingsPageHidden(item.to, featureFlags) &&
+      (!item.feature || featurePolicy.isEnabled(item.feature)) &&
       (!isLockedToCloud || item.to === LOCKED_CLOUD_SETTINGS_NAV_PATH),
   ).map((item) => {
     const renamedItem =

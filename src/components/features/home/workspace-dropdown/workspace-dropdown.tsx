@@ -12,6 +12,7 @@ import type { LocalWorkspace, LocalWorkspaceParent } from "#/types/workspace";
 import { I18nKey } from "#/i18n/declaration";
 import RepoIcon from "#/icons/repo.svg?react";
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 
 import { ClearButton } from "../shared/clear-button";
 import { ToggleButton } from "../shared/toggle-button";
@@ -274,44 +275,53 @@ export function WorkspaceDropdown({
     [closeMenu, onManageClick, preventDropdownMenuClose],
   );
 
+  const featurePolicy = useFeaturePolicy();
+  const canAddWorkspace = featurePolicy.isEnabled("workspaces.add");
+  const canManageWorkspaces =
+    featurePolicy.isEnabled("workspaces.manage") &&
+    (showManage ?? workspaces.length > 0);
+
   const stickyFooterItem = useMemo(
-    () => (
-      <div className={dropdownMenuListClassName}>
-        <button
-          type="button"
-          data-testid="add-workspaces-button"
-          className={cn(dropdownFooterActionClassName, "cursor-pointer")}
-          onMouseDown={preventDropdownMenuClose}
-          onTouchStart={preventDropdownMenuClose}
-          onTouchEnd={handleAddTouchEnd}
-          onClick={handleAddClick}
-        >
-          {t(I18nKey.HOME$ADD_WORKSPACES)}
-        </button>
-        {(showManage ?? workspaces.length > 0) && (
-          <button
-            type="button"
-            data-testid="manage-workspaces-button"
-            className={cn(dropdownFooterActionClassName, "cursor-pointer")}
-            onMouseDown={preventDropdownMenuClose}
-            onTouchStart={preventDropdownMenuClose}
-            onTouchEnd={handleManageTouchEnd}
-            onClick={handleManageClick}
-          >
-            {t(I18nKey.HOME$MANAGE_WORKSPACES)}
-          </button>
-        )}
-      </div>
-    ),
+    () =>
+      canAddWorkspace || canManageWorkspaces ? (
+        <div className={dropdownMenuListClassName}>
+          {canAddWorkspace && (
+            <button
+              type="button"
+              data-testid="add-workspaces-button"
+              className={cn(dropdownFooterActionClassName, "cursor-pointer")}
+              onMouseDown={preventDropdownMenuClose}
+              onTouchStart={preventDropdownMenuClose}
+              onTouchEnd={handleAddTouchEnd}
+              onClick={handleAddClick}
+            >
+              {t(I18nKey.HOME$ADD_WORKSPACES)}
+            </button>
+          )}
+          {canManageWorkspaces && (
+            <button
+              type="button"
+              data-testid="manage-workspaces-button"
+              className={cn(dropdownFooterActionClassName, "cursor-pointer")}
+              onMouseDown={preventDropdownMenuClose}
+              onTouchStart={preventDropdownMenuClose}
+              onTouchEnd={handleManageTouchEnd}
+              onClick={handleManageClick}
+            >
+              {t(I18nKey.HOME$MANAGE_WORKSPACES)}
+            </button>
+          )}
+        </div>
+      ) : undefined,
     [
+      canAddWorkspace,
+      canManageWorkspaces,
       handleAddClick,
       handleAddTouchEnd,
       handleManageClick,
       handleManageTouchEnd,
       preventDropdownMenuClose,
       t,
-      workspaces.length,
-      showManage,
     ],
   );
 

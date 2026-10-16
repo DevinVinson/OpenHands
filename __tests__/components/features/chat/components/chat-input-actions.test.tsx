@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "test-utils";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 import { ActiveBackendProvider } from "#/contexts/active-backend-context";
 import {
   __resetActiveStoreForTests,
@@ -364,6 +365,25 @@ describe("ChatInputActions — Switch agent profile gate (OSS-5735)", () => {
     renderWithProviders(
       <ChatInputActions disabled={false} hasStartedConversation />,
       { navigation: { conversationId: "conv-started" } },
+    );
+
+    openPlusMenu();
+
+    expect(await screen.findByTestId("tools-context-menu")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("switch-agent-profile-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  // @spec FP-004 — Agent profile switching under an operator policy
+  it("does not offer Switch agent profile when the operator turned switching off", async () => {
+    renderWithProviders(
+      <FeaturePolicyProvider
+        policy={{ version: 1, disabled: ["agentProfiles.switch"] }}
+      >
+        <ChatInputActions disabled={false} />
+      </FeaturePolicyProvider>,
+      { navigation: { conversationId: null } },
     );
 
     openPlusMenu();

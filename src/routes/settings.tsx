@@ -29,6 +29,20 @@ import {
 } from "#/utils/settings-utils";
 import { SettingsSectionHeaderProvider } from "#/contexts/settings-section-header-context";
 import { getLockedCloudHost } from "#/api/agent-server-config";
+import type { FeatureId } from "#/feature-policy/feature-policy";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
+
+// Settings pages not listed in the nav but owned by a gated feature.
+const UNLISTED_SETTINGS_PAGE_FEATURES: Record<string, FeatureId> = {
+  "/settings/agent": "agentProfiles.manage",
+};
+
+function findSettingsPageFeature(pathname: string): FeatureId | undefined {
+  const navItem = OSS_NAV_ITEMS.find(
+    (item) => pathname === item.to || pathname.startsWith(`${item.to}/`),
+  );
+  return navItem?.feature ?? UNLISTED_SETTINGS_PAGE_FEATURES[pathname];
+}
 
 export const clientLoader = async ({ request }: Route.ClientLoaderArgs) => {
   const url = new URL(request.url);
@@ -57,6 +71,7 @@ function SettingsScreen() {
   const location = useLocation();
   const matches = useMatches();
   const navItems = useSettingsNavItems();
+  const featurePolicy = useFeaturePolicy();
   const isMobile = useBreakpoint(SETTINGS_COMPACT_MAX_WIDTH);
   const [hideSectionHeader, setHideSectionHeader] = useState(false);
 
@@ -102,6 +117,19 @@ function SettingsScreen() {
     location.pathname !== LOCKED_CLOUD_SETTINGS_NAV_PATH
   ) {
     return <Navigate to={LOCKED_CLOUD_SETTINGS_NAV_PATH} replace />;
+  }
+
+  // @spec FP-004 — A page whose feature is off sends the user to the first
+  // page still listed.
+  const pageFeature = findSettingsPageFeature(location.pathname);
+  if (pageFeature && !featurePolicy.isEnabled(pageFeature)) {
+    const firstListed = navItems.find((item) => item.type === "item");
+    return (
+      <Navigate
+        to={firstListed?.type === "item" ? firstListed.item.to : "/"}
+        replace
+      />
+    );
   }
 
   // SettingsLayout renders the page's only <main> landmark (#17909). Its

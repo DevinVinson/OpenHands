@@ -24,6 +24,8 @@ import {
 import { getLockedCloudHost } from "#/api/agent-server-config";
 import { LOCKED_CLOUD_SETTINGS_NAV_PATH } from "#/constants/settings-nav";
 import { isApplePlatform } from "#/utils/utils";
+import type { FeatureId } from "#/feature-policy/feature-policy";
+import type { FeaturePolicyChecker } from "#/feature-policy/feature-policy-context";
 
 const ICON_SIZE = 18;
 
@@ -74,6 +76,8 @@ export interface CommandMenuItemDefinition {
   icon: React.ReactElement;
   to?: string;
   perform?: () => void;
+  /** Operator feature that must be on for this item to be listed. */
+  feature?: FeatureId;
 }
 
 /**
@@ -113,8 +117,14 @@ export const COMMAND_MENU_GROUP_ORDER: CommandMenuGroupId[] = [
 
 export const createCommandMenuItems = ({
   toggleSidebar,
+  featurePolicy,
+  hasCustomizeSection = true,
 }: {
   toggleSidebar: () => void;
+  /** Omit to list every item regardless of operator policy. */
+  featurePolicy?: FeaturePolicyChecker;
+  /** Whether any Customize section is available to land on. */
+  hasCustomizeSection?: boolean;
 }): CommandMenuItemDefinition[] => {
   const items: CommandMenuItemDefinition[] = [
     {
@@ -158,6 +168,7 @@ export const createCommandMenuItems = ({
       keywordsKey: I18nKey.COMMAND_MENU$MCP_KEYWORDS,
       icon: <Wrench size={ICON_SIZE} />,
       to: COMMAND_MENU_ROUTE.mcp,
+      feature: "customize.mcp",
     },
     {
       id: "settings",
@@ -176,6 +187,7 @@ export const createCommandMenuItems = ({
       keywordsKey: I18nKey.COMMAND_MENU$AGENT_SETTINGS_KEYWORDS,
       icon: <Bot size={ICON_SIZE} />,
       to: COMMAND_MENU_ROUTE.agentSettings,
+      feature: "agentProfiles.manage",
     },
     {
       id: "llm-settings",
@@ -185,6 +197,7 @@ export const createCommandMenuItems = ({
       keywordsKey: I18nKey.COMMAND_MENU$LLM_SETTINGS_KEYWORDS,
       icon: <Search size={ICON_SIZE} />,
       to: COMMAND_MENU_ROUTE.llmSettings,
+      feature: "llmProfiles.manage",
     },
     {
       id: "meta-llm-settings",
@@ -194,6 +207,7 @@ export const createCommandMenuItems = ({
       keywordsKey: I18nKey.COMMAND_MENU$META_LLM_SETTINGS_KEYWORDS,
       icon: <Route size={ICON_SIZE} />,
       to: COMMAND_MENU_ROUTE.metaLlmSettings,
+      feature: "llmProfiles.manage",
     },
     {
       id: "condenser-settings",
@@ -257,9 +271,11 @@ export const createCommandMenuItems = ({
 
   return items.filter(
     (item) =>
-      !isLockedToCloud ||
-      item.group !== "settings" ||
-      item.to === COMMAND_MENU_ROUTE.settings ||
-      item.to === LOCKED_CLOUD_SETTINGS_NAV_PATH,
+      (!item.feature || (featurePolicy?.isEnabled(item.feature) ?? true)) &&
+      (item.id !== "customize" || hasCustomizeSection) &&
+      (!isLockedToCloud ||
+        item.group !== "settings" ||
+        item.to === COMMAND_MENU_ROUTE.settings ||
+        item.to === LOCKED_CLOUD_SETTINGS_NAV_PATH),
   );
 };

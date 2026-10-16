@@ -34,8 +34,9 @@ import {
   extensionModuleCardGridContainerClassName,
   extensionModuleEmptyStateClassName,
 } from "#/utils/extension-module-card-classes";
+import { RequireFeature } from "./require-feature";
 
-export default function SkillsPluginsScreen() {
+function SkillsPluginsScreenContent() {
   const { t } = useTranslation("openhands");
   const { backend } = useActiveBackend();
   const { navigate } = useNavigation();
@@ -242,5 +243,13 @@ export default function SkillsPluginsScreen() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function SkillsPluginsScreen() {
+  return (
+    <RequireFeature feature="customize.plugins">
+      <SkillsPluginsScreenContent />
+    </RequireFeature>
   );
 }

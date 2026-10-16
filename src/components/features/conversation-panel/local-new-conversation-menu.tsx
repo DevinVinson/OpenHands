@@ -25,6 +25,7 @@ import RepoIcon from "#/icons/repo.svg?react";
 
 import { FolderBrowserModal } from "#/components/features/home/workspace-dropdown/folder-browser-modal";
 import { ManageWorkspacesModal } from "#/components/features/home/workspace-dropdown/manage-workspaces-modal";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
 import { Divider } from "#/ui/divider";
@@ -90,6 +91,11 @@ export function LocalNewConversationMenu({
     getWorkspacesUnsupportedMessage(workspacesError, t);
   const [browserOpen, setBrowserOpen] = React.useState(false);
   const [manageOpen, setManageOpen] = React.useState(false);
+  const featurePolicy = useFeaturePolicy();
+  const canAddWorkspace = featurePolicy.isEnabled("workspaces.add");
+  const canManageWorkspaces =
+    featurePolicy.isEnabled("workspaces.manage") &&
+    (workspaces.length > 0 || workspaceParents.length > 0);
 
   const { mutate: createConversation, isPending } = useCreateConversation();
   const isCreatingElsewhere = useIsCreatingConversation();
@@ -264,31 +270,33 @@ export function LocalNewConversationMenu({
             ))}
           </ul>
 
-          <div
-            className={cn("flex flex-col", dropdownMenuListClassName)}
-            data-testid="new-conversation-menu-footer"
-          >
-            <Divider
-              inset="menu"
-              testId="new-conversation-menu-footer-divider"
-            />
-            {addWorkspacesControl}
-            {(workspaces.length > 0 || workspaceParents.length > 0) && (
-              <button
-                type="button"
-                data-testid="manage-workspaces-button"
-                onMouseDown={keepPopoverOpenOnMouseDown}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setManageOpen(true);
-                }}
-                className={itemClass}
-              >
-                {t(I18nKey.HOME$MANAGE_WORKSPACES)}
-              </button>
-            )}
-          </div>
+          {(canAddWorkspace || canManageWorkspaces) && (
+            <div
+              className={cn("flex flex-col", dropdownMenuListClassName)}
+              data-testid="new-conversation-menu-footer"
+            >
+              <Divider
+                inset="menu"
+                testId="new-conversation-menu-footer-divider"
+              />
+              {canAddWorkspace && addWorkspacesControl}
+              {canManageWorkspaces && (
+                <button
+                  type="button"
+                  data-testid="manage-workspaces-button"
+                  onMouseDown={keepPopoverOpenOnMouseDown}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setManageOpen(true);
+                  }}
+                  className={itemClass}
+                >
+                  {t(I18nKey.HOME$MANAGE_WORKSPACES)}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

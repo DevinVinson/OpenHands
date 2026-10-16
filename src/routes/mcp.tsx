@@ -32,6 +32,7 @@ import {
   CustomServerEditor,
   type McpSectionFilter,
 } from "#/components/features/mcp-page";
+import { RequireFeature } from "./require-feature";
 
 // No ACP guard here (unlike `/settings` and `/settings/condenser`): MCP
 // servers configured via `agent_settings.mcp_config` are now forwarded to
@@ -39,7 +40,7 @@ import {
 // both OpenHands and ACP agents. The same editor and MCP settings storage
 // drive both kinds.
 
-export default function MCPPage() {
+function MCPPageContent() {
   const { t } = useTranslation("openhands");
   const { data: settings, isLoading } = useSettings();
   const { mutate: updateMcpServer } = useUpdateMcpServer();
@@ -189,5 +190,13 @@ export default function MCPPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function MCPPage() {
+  return (
+    <RequireFeature feature="customize.mcp">
+      <MCPPageContent />
+    </RequireFeature>
   );
 }

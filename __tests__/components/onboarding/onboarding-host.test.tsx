@@ -15,6 +15,8 @@ import {
 } from "#/api/backend-registry/active-store";
 import { ActiveBackendProvider } from "#/contexts/active-backend-context";
 import { NavigationProvider } from "#/context/navigation-context";
+import type { FeatureId } from "#/feature-policy/feature-policy";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 // We don't need to exercise the modal's internals here; just verify
 // whether OnboardingHost mounts it at all.
@@ -24,7 +26,7 @@ vi.mock("#/components/features/onboarding/onboarding-modal", () => ({
   ),
 }));
 
-function renderHost() {
+function renderHost(disabled: FeatureId[] = []) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -39,7 +41,9 @@ function renderHost() {
       <MemoryRouter initialEntries={["/"]}>
         <ActiveBackendProvider>
           <NavigationProvider value={navigationValue}>
-            <OnboardingHost />
+            <FeaturePolicyProvider policy={{ version: 1, disabled }}>
+              <OnboardingHost />
+            </FeaturePolicyProvider>
           </NavigationProvider>
         </ActiveBackendProvider>
       </MemoryRouter>
@@ -91,6 +95,27 @@ afterEach(() => {
 });
 
 describe("OnboardingHost", () => {
+  // @spec FP-006 — The operator prepared the agent and LLM; users skip setup
+  it("skips onboarding when the operator locked LLM profile management", async () => {
+    const getSettings = vi
+      .spyOn(SettingsService, "getSettings")
+      .mockResolvedValue({
+        ...DEFAULT_SETTINGS,
+        llm_api_key_set: false,
+        agent_settings: {
+          ...DEFAULT_SETTINGS.agent_settings,
+          llm: { model: "" },
+        },
+      });
+
+    renderHost(["llmProfiles.manage"]);
+
+    await waitFor(() => expect(getSettings).toHaveBeenCalled());
+    expect(
+      screen.queryByTestId("onboarding-modal-stub"),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders the onboarding modal for a fresh install with no configured LLM", async () => {
     vi.spyOn(SettingsService, "getSettings").mockResolvedValue({
       ...DEFAULT_SETTINGS,

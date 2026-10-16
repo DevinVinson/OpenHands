@@ -5,6 +5,7 @@ import {
   ONBOARDING_COMPLETED_STORAGE_KEY,
   useOnboardingCompletion,
 } from "#/components/features/onboarding/use-onboarding-completion";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -23,6 +24,24 @@ describe("useOnboardingCompletion", () => {
     window.localStorage.setItem(ONBOARDING_COMPLETED_STORAGE_KEY, "1");
     const { result } = renderHook(() => useOnboardingCompletion());
     expect(result.current.isCompleted).toBe(true);
+  });
+
+  // @spec FP-006 — The operator prepared the agent and LLM; users skip setup
+  it("counts as complete without persisting when the operator locked agent profiles", () => {
+    const { result } = renderHook(() => useOnboardingCompletion(), {
+      wrapper: ({ children }) => (
+        <FeaturePolicyProvider
+          policy={{ version: 1, disabled: ["agentProfiles.manage"] }}
+        >
+          {children}
+        </FeaturePolicyProvider>
+      ),
+    });
+
+    expect(result.current.isCompleted).toBe(true);
+    expect(
+      window.localStorage.getItem(ONBOARDING_COMPLETED_STORAGE_KEY),
+    ).toBeNull();
   });
 
   it("persists completion to localStorage and flips the flag", () => {

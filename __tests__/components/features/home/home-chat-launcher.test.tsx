@@ -12,6 +12,7 @@ import {
   LAST_LOCAL_WORKSPACE_MODE_STORAGE_KEY,
   writeStoredLocalWorkspaceMode,
 } from "#/utils/workspace-mode";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 const mockNavigate = vi.fn();
 const mockUseActiveBackend = vi.fn();
@@ -371,6 +372,22 @@ describe("HomeChatLauncher", () => {
   afterEach(() => {
     toast.remove();
     window.localStorage.removeItem(LAST_LOCAL_WORKSPACE_MODE_STORAGE_KEY);
+  });
+
+  // @spec FP-004 — Picking plugins for a new conversation is part of Plugins
+  it("hides the plugin picker when the operator turned Plugins off", () => {
+    render(
+      <FeaturePolicyProvider
+        policy={{ version: 1, disabled: ["customize.plugins"] }}
+      >
+        <QueryClientProvider client={new QueryClient()}>
+          <HomeChatLauncher />
+        </QueryClientProvider>
+      </FeaturePolicyProvider>,
+    );
+
+    expect(screen.getByTestId("open-workspace-button")).toBeInTheDocument();
+    expect(screen.queryByTestId("open-plugin-picker")).not.toBeInTheDocument();
   });
 
   it("defaults to Code mode and switches to Automate mode", async () => {

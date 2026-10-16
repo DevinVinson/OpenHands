@@ -22,6 +22,7 @@ import {
 } from "#/contexts/active-backend-context";
 import { CloudOrganizationBoundary } from "#/components/features/backends/cloud-organization-boundary";
 import { BackendSelector } from "#/components/features/backends/backend-selector";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 import {
   __resetEnvironmentSwitchOverlayForTests,
   EnvironmentSwitchOverlay,
@@ -1144,5 +1145,46 @@ describe("BackendSelector", () => {
         expect(dot.getAttribute("data-status")).toBe("disconnected");
       });
     });
+  });
+});
+
+// @spec FP-004 — Backend switching and management under an operator policy
+describe("BackendSelector feature policy", () => {
+  it("lists only the active backend when switching is off", async () => {
+    renderWithProviders(
+      <TestSeed onMount={(ctx) => ctx.addBackend(SEED_LOCAL_1)}>
+        <FeaturePolicyProvider
+          policy={{ version: 1, disabled: ["backends.switch"] }}
+        >
+          <BackendSelector />
+        </FeaturePolicyProvider>
+      </TestSeed>,
+    );
+
+    await openDropdown();
+
+    // Adding "Local 1" made it the active backend; the seeded "Local" is not
+    // offered as a switch target.
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("option", { name: /Local 1/ })).toBeInTheDocument();
+  });
+
+  it("hides the add and manage actions when management is off", async () => {
+    renderWithProviders(
+      <FeaturePolicyProvider
+        policy={{ version: 1, disabled: ["backends.manage"] }}
+      >
+        <BackendSelector />
+      </FeaturePolicyProvider>,
+    );
+
+    await openDropdown();
+
+    expect(
+      screen.queryByTestId("add-backend-menu-item"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("manage-backends-menu-item"),
+    ).not.toBeInTheDocument();
   });
 });

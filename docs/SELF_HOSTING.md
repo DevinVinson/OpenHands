@@ -179,6 +179,28 @@ before they can use it. Without `--public`, the key is auto-injected into
 the frontend (convenient for local-only use, but unsafe for a
 publicly-reachable deployment).
 
+### Limit what users can change (optional)
+
+To hand a prepared setup to a few users, configure it fully first (workspaces,
+LLM profiles, agent profiles, extensions), then restart with a feature policy
+that turns off the controls for changing it:
+
+```ini
+Environment=AGENT_CANVAS_FEATURES={"version":1,"disabled":["backends.switch","backends.manage","workspaces.add","workspaces.manage","llmProfiles.switch","llmProfiles.manage","agentProfiles.switch","agentProfiles.manage","customize.plugins"]}
+```
+
+Or put the same JSON in a file and set
+`AGENT_CANVAS_FEATURES_FILE=/etc/agent-canvas/policy.json`. Every feature is on
+unless listed; the IDs and what each one turns off are in
+[`config/features.json`](../config/features.json). An invalid policy stops
+Agent Canvas from starting rather than serving the full UI. Changing the policy
+needs a restart, not a rebuild.
+
+> [!IMPORTANT]
+> The policy hides controls in the Agent Canvas UI; it is not a security
+> boundary. Anyone with the API key can call the agent server directly, and
+> the agent itself has a shell on the machine.
+
 ## 4. (Optional) Get a domain and put nginx + Let's Encrypt in front
 
 If you want to reach the UI from a browser without an SSH tunnel — for

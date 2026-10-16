@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OSS_NAV_ITEMS } from "#/constants/settings-nav";
 import { useSettingsNavItems } from "#/hooks/use-settings-nav-items";
 import { WebClientConfig } from "#/api/option-service/option.types";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 const useConfigMock = vi.fn();
 const useSettingsMock = vi.fn();
@@ -132,6 +133,32 @@ describe("useSettingsNavItems", () => {
     expect(paths).not.toContain("/settings/llm");
     expect(paths).toContain("/settings/app");
     expect(paths).toContain("/settings/secrets");
+  });
+
+  // @spec FP-004 — Settings pages owned by a feature the operator turned off
+  it("drops the LLM and agent profile pages when their management is off", () => {
+    useConfigMock.mockReturnValue({ data: createConfig() });
+
+    const { result } = renderHook(() => useSettingsNavItems(), {
+      wrapper: ({ children }) => (
+        <FeaturePolicyProvider
+          policy={{
+            version: 1,
+            disabled: ["llmProfiles.manage", "agentProfiles.manage"],
+          }}
+        >
+          {children}
+        </FeaturePolicyProvider>
+      ),
+    });
+    const paths = result.current.map((item) =>
+      item.type === "item" ? item.item.to : null,
+    );
+
+    expect(paths).not.toContain("/settings/llm");
+    expect(paths).not.toContain("/settings/meta-llm");
+    expect(paths).not.toContain("/settings/agents");
+    expect(paths).toContain("/settings/app");
   });
 
   it("never lists removed settings sub-pages", () => {

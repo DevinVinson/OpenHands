@@ -15,6 +15,8 @@ import AgentProfilesService from "#/api/agent-profiles-service/agent-profiles-se
 import { MOCK_DEFAULT_USER_SETTINGS } from "#/mocks/handlers";
 import { Settings } from "#/types/settings";
 import { WebClientConfig } from "#/api/option-service/option.types";
+import type { FeatureId } from "#/feature-policy/feature-policy";
+import { FeaturePolicyProvider } from "#/feature-policy/feature-policy-context";
 
 function buildSettings(overrides: Partial<Settings> = {}): Settings {
   return {
@@ -57,7 +59,7 @@ function ProbedBanner() {
   );
 }
 
-function renderBanner() {
+function renderBanner(disabled: FeatureId[] = []) {
   const navigate = vi.fn();
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -72,7 +74,9 @@ function renderBanner() {
           navigate,
         }}
       >
-        <ProbedBanner />
+        <FeaturePolicyProvider policy={{ version: 1, disabled }}>
+          <ProbedBanner />
+        </FeaturePolicyProvider>
       </NavigationProvider>
     </QueryClientProvider>,
   );
@@ -222,6 +226,22 @@ describe("LlmNotConfiguredBanner", () => {
     expect(
       await screen.findByTestId("home-llm-not-configured-banner"),
     ).toBeInTheDocument();
+  });
+
+  // @spec FP-004 — Warn, but offer no path to a page the operator turned off
+  it("keeps the warning but drops the action when LLM management is off", async () => {
+    vi.spyOn(SettingsService, "getSettings").mockResolvedValue(
+      buildSettings({ llm_api_key_set: false }),
+    );
+
+    renderBanner(["llmProfiles.manage"]);
+
+    expect(
+      await screen.findByTestId("home-llm-not-configured-banner"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("home-llm-not-configured-action"),
+    ).not.toBeInTheDocument();
   });
 
   it("routes the user to LLM settings when the action is clicked", async () => {

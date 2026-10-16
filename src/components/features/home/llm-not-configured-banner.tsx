@@ -6,6 +6,7 @@ import { useLlmConfigured } from "#/hooks/use-llm-configured";
 import { BrandButton } from "#/components/features/settings/brand-button";
 import { Typography } from "#/ui/typography";
 import { getLockedCloudHost } from "#/api/agent-server-config";
+import { useFeaturePolicy } from "#/feature-policy/feature-policy-context";
 
 /**
  * Warns the user on the home screen when the active agent has no usable LLM —
@@ -22,6 +23,7 @@ export function LlmNotConfiguredBanner() {
   const { t } = useTranslation("openhands");
   const { navigate } = useNavigation();
   const { isConfigured, isLoading } = useLlmConfigured();
+  const canManageLlm = useFeaturePolicy().isEnabled("llmProfiles.manage");
 
   if (isLoading || isConfigured) {
     return null;
@@ -42,8 +44,9 @@ export function LlmNotConfiguredBanner() {
         </Typography.Text>
       </div>
 
-      {/* Locked-to-Cloud blocks the Canvas LLM page (OHE-3457). */}
-      {getLockedCloudHost() === null && (
+      {/* Locked-to-Cloud blocks the Canvas LLM page (OHE-3457), and so does an
+          operator who turned LLM management off (FP-004). */}
+      {getLockedCloudHost() === null && canManageLlm && (
         <BrandButton
           testId="home-llm-not-configured-action"
           type="button"
