@@ -43,6 +43,8 @@ interface ConversationCardProps {
    * leaves this undefined there and the menu item disappears.
    */
   onEditTags?: () => void;
+  onTurnIntoProject?: () => void;
+  onOpenProject?: () => void;
   showOptions?: boolean;
   title: string;
   selectedRepository: RepositorySelection | null;
@@ -85,6 +87,8 @@ export function ConversationCard({
   onStop,
   onChangeTitle,
   onEditTags,
+  onTurnIntoProject,
+  onOpenProject,
   showOptions,
   title,
   selectedRepository,
@@ -173,6 +177,14 @@ export function ConversationCard({
     onContextMenuToggle?.(false);
   };
 
+  const runMenuAction =
+    (action?: () => void) => (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      action?.();
+      onContextMenuToggle?.(false);
+    };
+
   const handleDownloadViaVSCode = async (
     event: React.MouseEvent<HTMLButtonElement>,
   ) => {
@@ -255,6 +267,8 @@ export function ConversationCard({
     onUnarchive ||
     onChangeTitle ||
     onEditTags ||
+    onTurnIntoProject ||
+    onOpenProject ||
     showOptions
   );
   const hasHoverActions = hasContextMenu || !!onTogglePin;
@@ -343,6 +357,12 @@ export function ConversationCard({
                       onStop={onStop && handleStop}
                       onEdit={onChangeTitle && handleEdit}
                       onEditTags={onEditTags && handleEditTags}
+                      onTurnIntoProject={
+                        onTurnIntoProject && runMenuAction(onTurnIntoProject)
+                      }
+                      onOpenProject={
+                        onOpenProject && runMenuAction(onOpenProject)
+                      }
                       onDownloadViaVSCode={handleDownloadViaVSCode}
                       onDownloadConversation={handleDownloadConversation}
                       executionStatus={executionStatus}
@@ -371,6 +391,10 @@ export function ConversationCard({
                   onStop={onStop && handleStop}
                   onEdit={onChangeTitle && handleEdit}
                   onEditTags={onEditTags && handleEditTags}
+                  onTurnIntoProject={
+                    onTurnIntoProject && runMenuAction(onTurnIntoProject)
+                  }
+                  onOpenProject={onOpenProject && runMenuAction(onOpenProject)}
                   onDownloadViaVSCode={handleDownloadViaVSCode}
                   onDownloadConversation={handleDownloadConversation}
                   executionStatus={executionStatus}

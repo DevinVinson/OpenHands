@@ -7,7 +7,13 @@ import { ContextMenuListItem } from "../../context-menu/context-menu-list-item";
 import { I18nKey } from "#/i18n/declaration";
 import { ConversationNameContextMenuIconText } from "../../conversation/conversation-name-context-menu-icon-text";
 
-import { Archive, ArchiveRestore, Gauge, Tags } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  FolderKanban,
+  Gauge,
+  Tags,
+} from "lucide-react";
 import EditIcon from "#/icons/u-edit.svg?react";
 import SkillsIcon from "#/icons/skills.svg?react";
 import ToolsIcon from "#/icons/u-tools.svg?react";
@@ -24,6 +30,10 @@ interface ConversationCardContextMenuProps {
   onStop?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onEdit?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onEditTags?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  /** Promote this conversation to a project (prototype). */
+  onTurnIntoProject?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  /** Shown instead of `onTurnIntoProject` once the row belongs to one. */
+  onOpenProject?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onDisplayCost?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onShowAgentTools?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onShowSkills?: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -46,6 +56,8 @@ export function ConversationCardContextMenu({
   onStop,
   onEdit,
   onEditTags,
+  onTurnIntoProject,
+  onOpenProject,
   onDisplayCost,
   onShowAgentTools,
   onShowSkills,
@@ -102,6 +114,36 @@ export function ConversationCardContextMenu({
           : "z-[200] mt-0"
       }
     >
+      {generateSection(
+        [
+          onTurnIntoProject && (
+            <ContextMenuListItem
+              key="turn-into-project-button"
+              testId="turn-into-project-button"
+              onClick={onTurnIntoProject}
+            >
+              <ConversationNameContextMenuIconText
+                icon={<FolderKanban className="h-4 w-4" aria-hidden />}
+                text={t(I18nKey.PROJECTS$TURN_INTO_PROJECT)}
+              />
+            </ContextMenuListItem>
+          ),
+          onOpenProject && (
+            <ContextMenuListItem
+              key="open-project-button"
+              testId="open-project-button"
+              onClick={onOpenProject}
+            >
+              <ConversationNameContextMenuIconText
+                icon={<FolderKanban className="h-4 w-4" aria-hidden />}
+                text={t(I18nKey.PROJECTS$OPEN_PROJECT)}
+              />
+            </ContextMenuListItem>
+          ),
+        ],
+        // eslint-disable-next-line i18next/no-literal-string -- internal section id, not user-facing
+        "project-section",
+      )}
       {generateSection(
         [
           onEdit && (

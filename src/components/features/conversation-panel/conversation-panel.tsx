@@ -62,6 +62,11 @@ import { useArchivedConversationsStore } from "#/stores/archived-conversations-s
 import { usePinnedConversationsStore } from "#/stores/pinned-conversations-store";
 import { uniqueById } from "#/utils/unique-by-id";
 import {
+  projectPath,
+  useBackendProjects,
+  useTurnConversationIntoProject,
+} from "#/hooks/use-projects";
+import {
   isEffectivelyArchivedConversation,
   isMissingSandboxStatus,
 } from "#/utils/conversation-archive-status";
@@ -88,6 +93,15 @@ export function ConversationPanel({
   const { t } = useTranslation("openhands");
   const { conversationId: currentConversationId, navigate } = useNavigation();
   const { backend: activeBackend } = useActiveBackend();
+  const turnIntoProject = useTurnConversationIntoProject();
+  const { all: allProjects } = useBackendProjects();
+  const projectIdByConversationId = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const project of allProjects) {
+      for (const id of project.conversationIds) map.set(id, project.id);
+    }
+    return map;
+  }, [allProjects]);
   const backendScopedPath = useBackendScopedPath();
   // Click-outside is only relevant in the legacy drawer mode where an
   // onClose handler is provided. When the panel is rendered inline (e.g.
@@ -994,6 +1008,25 @@ export function ConversationPanel({
               onEditTags={
                 activeBackend.kind === "local"
                   ? () => handleEditTags(conversation.id)
+                  : undefined
+              }
+              onTurnIntoProject={
+                projectIdByConversationId.has(conversation.id)
+                  ? undefined
+                  : () => {
+                      turnIntoProject(conversation).catch(() =>
+                        displayErrorToast(t(I18nKey.PROJECTS$SETUP_FAILED)),
+                      );
+                    }
+              }
+              onOpenProject={
+                projectIdByConversationId.has(conversation.id)
+                  ? () =>
+                      navigate(
+                        projectPath(
+                          projectIdByConversationId.get(conversation.id)!,
+                        ),
+                      )
                   : undefined
               }
               onChangeTitle={(title) =>

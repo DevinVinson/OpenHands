@@ -627,6 +627,9 @@ export const RESERVED_CONVERSATION_TAG_KEYS: ReadonlySet<string> = new Set([
   "branch",
   "archiveworkspacepath",
   "workspace",
+  // Project membership mirror (`PROJECT_TAG_KEY` in utils/project-prompts).
+  // Not `project`: users already tag conversations with that key themselves.
+  "canvasproject",
   "working_dir",
   LOCAL_PLANNER_PARENT_TAG_KEY,
 ]);
