@@ -1,4 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { EnterpriseDocsCallout } from "#/components/shared/enterprise-docs-callout";
+import { getManagedGitPlacement } from "#/utils/enterprise-cta-preview";
+import { isGitTokenSecretName } from "#/constants/enterprise-docs";
 import React, { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { BackNavButton } from "#/components/shared/buttons/back-nav-button";
@@ -99,6 +102,12 @@ export function SecretsSettingsScreen() {
       ? t(I18nKey.SECRETS$ADD_A_SECRET)
       : t(I18nKey.SECRETS$EDIT_A_SECRET);
 
+  // Only nudge toward managed Git connections when the user is already
+  // storing a hand-made Git provider token as a secret.
+  const showManagedGitCallout =
+    getManagedGitPlacement() === "secrets_settings" &&
+    (secrets ?? []).some((secret) => isGitTokenSecretName(secret.name));
+
   return (
     <div data-testid="secrets-settings-screen" className="flex flex-col gap-6">
       {view === "list" ? (
@@ -111,6 +120,18 @@ export function SecretsSettingsScreen() {
             >
               {t(I18nKey.SETTINGS$PAGE_SECRETS_SUBLINE)}
             </p>
+            <EnterpriseDocsCallout
+              ctaId="org_secrets"
+              surface="secrets_settings"
+              className="pt-2"
+            />
+            {showManagedGitCallout ? (
+              <EnterpriseDocsCallout
+                ctaId="managed_git"
+                surface="secrets_settings"
+                className="pt-1"
+              />
+            ) : null}
           </div>
           <BrandButton
             testId="add-secret-button"

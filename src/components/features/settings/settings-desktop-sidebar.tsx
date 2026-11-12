@@ -7,6 +7,7 @@ import { I18nKey } from "#/i18n/declaration";
 import { SettingsNavRenderedItem } from "#/hooks/use-settings-nav-items";
 import { SidebarNavLink } from "#/components/features/sidebar/sidebar-nav-link";
 import { AgentCanvasUpdateCard } from "#/components/features/settings/agent-canvas-update-card";
+import { EnterpriseDocsCallout } from "#/components/shared/enterprise-docs-callout";
 import { BackendSyncedSettingsBadge } from "#/components/features/settings/backend-synced-settings-badge";
 import { CloudSettingsLink } from "#/components/features/settings/cloud-settings-link";
 import { IntegrationsSettingsLink } from "#/components/features/settings/integrations-settings-link";
@@ -43,6 +44,11 @@ export function SettingsDesktopSidebar({
       <div className="px-2 pt-3">
         <BackendSyncedSettingsBadge />
       </div>
+      <EnterpriseDocsCallout
+        ctaId="team_setup"
+        surface="settings_sidebar"
+        className="px-2 pt-3"
+      />
     </aside>
   );
 }

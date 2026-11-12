@@ -23,6 +23,8 @@ import {
   INTEGRATION_CATALOG as MCP_MARKETPLACE,
   type IntegrationCatalogEntry as MarketplaceEntry,
 } from "@openhands/extensions/integrations";
+import { EnterpriseDocsCallout } from "#/components/shared/enterprise-docs-callout";
+import { getManagedGitPlacement } from "#/utils/enterprise-cta-preview";
 import { MCPServerConfig } from "#/types/mcp-server";
 import { flattenMcpConfig } from "#/utils/mcp-installed-servers";
 import {
@@ -149,6 +151,18 @@ export default function MCPPage() {
                 <div className="max-w-2xl text-sm text-tertiary-light">
                   {t(I18nKey.MCP$PAGE_DESCRIPTION)}
                 </div>
+                <EnterpriseDocsCallout
+                  ctaId="integrations"
+                  surface="mcp_page"
+                  className="max-w-2xl pt-2"
+                />
+                {getManagedGitPlacement() === "mcp_page" ? (
+                  <EnterpriseDocsCallout
+                    ctaId="managed_git"
+                    surface="mcp_page"
+                    className="max-w-2xl pt-1"
+                  />
+                ) : null}
               </div>
               <BrandButton
                 type="button"
