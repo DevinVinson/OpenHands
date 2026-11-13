@@ -56,22 +56,14 @@ describe("EnterpriseDocsCallout", () => {
   });
 
   it.each([
-    // [case, backend kind, cloud config, locked host, self-hosting shown, team feature shown]
-    ["a local backend", "local", undefined, null, true, true],
-    [
-      "OpenHands Cloud",
-      "cloud",
-      { deploymentMode: "cloud" },
-      null,
-      true,
-      false,
-    ],
+    // [case, backend kind, cloud config, locked host, callouts shown]
+    ["a local backend", "local", undefined, null, true],
+    ["OpenHands Cloud", "cloud", { deploymentMode: "cloud" }, null, true],
     [
       "a self-hosted Enterprise instance",
       "cloud",
       { deploymentMode: "self_hosted" },
       null,
-      false,
       false,
     ],
     [
@@ -80,11 +72,10 @@ describe("EnterpriseDocsCallout", () => {
       undefined,
       "https://app.example.com",
       false,
-      false,
     ],
   ] as const)(
-    "shows only callouts for capabilities %s lacks",
-    (_name, kind, data, locked, showsSelfHosting, showsTeamFeature) => {
+    "shows callouts only when %s is not Enterprise",
+    (_name, kind, data, locked, isShown) => {
       backendKind.current = kind;
       cloudConfig.mockReturnValue({ data, isLoading: false });
       lockedHost.mockReturnValue(locked);
@@ -92,11 +83,8 @@ describe("EnterpriseDocsCallout", () => {
       renderCallouts();
 
       expect(
-        screen.queryByTestId("enterprise-callout-compare_options") !== null,
-      ).toBe(showsSelfHosting);
-      expect(
-        screen.queryByTestId("enterprise-callout-org_secrets") !== null,
-      ).toBe(showsTeamFeature);
+        screen.queryAllByTestId(/^enterprise-callout-[a-z_]+$/),
+      ).toHaveLength(isShown ? 2 : 0);
     },
   );
 

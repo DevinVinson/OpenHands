@@ -7,7 +7,7 @@ import {
   type EnterpriseCalloutId,
   type EnterpriseCalloutSurface,
 } from "#/constants/enterprise-docs";
-import { useEnterpriseCalloutAudience } from "#/hooks/use-enterprise-callout-audience";
+import { useEnterpriseCalloutsVisible } from "#/hooks/use-enterprise-callouts-visible";
 import { useTracking } from "#/hooks/use-tracking";
 import {
   type EnterpriseCalloutVariant,
@@ -30,8 +30,7 @@ const VARIANT_CLASSES: Record<EnterpriseCalloutVariant, string> = {
 
 /**
  * A short, non-blocking note that points at the official docs for an
- * OpenHands Cloud or Enterprise capability. Renders nothing for backends
- * that already provide the capability.
+ * OpenHands Enterprise capability. Renders nothing on Enterprise backends.
  */
 export function EnterpriseDocsCallout({
   ctaId,
@@ -40,12 +39,12 @@ export function EnterpriseDocsCallout({
   className,
 }: EnterpriseDocsCalloutProps) {
   const { t } = useTranslation("openhands");
-  const audience = useEnterpriseCalloutAudience();
+  const isVisible = useEnterpriseCalloutsVisible();
   const { trackEnterpriseDocsLinkClicked } = useTracking();
   const bodyId = useId();
 
   const definition = ENTERPRISE_CALLOUTS[ctaId];
-  if (audience === null || !definition.audiences.includes(audience)) {
+  if (!isVisible) {
     return null;
   }
 

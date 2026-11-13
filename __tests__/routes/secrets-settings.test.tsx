@@ -42,28 +42,6 @@ describe("SecretsSettingsScreen", () => {
     expect(screen.getByTestId("add-secret-button")).toBeInTheDocument();
   });
 
-  it.each([
-    ["a hand-managed Git token", "GITHUB_PERSONAL_ACCESS_TOKEN", true],
-    ["only non-Git secrets", "NOTION_API_KEY", false],
-  ])(
-    "points to managed Git connections only when storing %s",
-    async (_name, secretName, showsManagedGit) => {
-      vi.spyOn(SecretsService, "getSecrets").mockResolvedValue([
-        { name: secretName, description: "" },
-      ]);
-
-      renderSecretsSettingsScreen();
-
-      await screen.findByText(secretName);
-      expect(
-        screen.getByTestId("enterprise-callout-org_secrets"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("enterprise-callout-managed_git") !== null,
-      ).toBe(showsManagedGit);
-    },
-  );
-
   it("disables Add Secret submit until required fields are filled", async () => {
     vi.spyOn(SecretsService, "getSecrets").mockResolvedValue([]);
     const user = userEvent.setup();

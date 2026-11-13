@@ -1,6 +1,4 @@
 import React from "react";
-import { EnterpriseDocsCallout } from "#/components/shared/enterprise-docs-callout";
-import { getManagedGitPlacement } from "#/utils/enterprise-cta-preview";
 import { useTranslation } from "react-i18next";
 import { useSaveSettings } from "#/hooks/mutation/use-save-settings";
 import { useSettings } from "#/hooks/query/use-settings";
@@ -290,13 +288,6 @@ function AppSettingsForm() {
             <p className="mb-4 text-sm leading-5 text-tertiary-light">
               {t(I18nKey.SETTINGS$GIT_SETTINGS_DESCRIPTION)}
             </p>
-            {getManagedGitPlacement() === "git_settings" ? (
-              <EnterpriseDocsCallout
-                ctaId="managed_git"
-                surface="git_settings"
-                className="mb-4"
-              />
-            ) : null}
             <div className="flex flex-col gap-6">
               <SettingsInput
                 testId="git-user-name-input"
