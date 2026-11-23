@@ -43,6 +43,9 @@ export default [
     route("automations/new/:automationId", "routes/automation-setup-route.tsx"),
     route("automations/setup", "routes/automation-setup-new.tsx"),
     route("automations/:automationId", "routes/automation-detail.tsx"),
+    // PROTOTYPE: Factories wireframe (static data, no backend contract yet).
+    route("factories", "routes/factories-list.tsx"),
+    route("factories/:factoryId/*", "routes/factory.tsx"),
     // Unknown URLs (including /settings/<x>) render inside the app shell.
     route("*", "routes/not-found.tsx"),
   ]),

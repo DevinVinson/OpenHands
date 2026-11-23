@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   ChevronLeft,
   ChevronRight,
+  Factory as FactoryIcon,
   Plus,
   Server,
   Settings,
@@ -31,6 +32,8 @@ import { AgentCanvasVersionTile } from "#/components/features/settings/agent-can
 import { SidebarConversationList } from "./sidebar-conversation-list";
 import { SidebarOnboardingChecklist } from "./sidebar-onboarding-checklist";
 import AutomationsIcon from "#/icons/automations.svg?react";
+import { SidebarFactoriesSection } from "#/components/features/factories/sidebar-factories-section";
+import { FACTORIES_PATH } from "#/components/features/factories/factory-data";
 import {
   SIDEBAR_COLLAPSE_TOGGLE_OVERLAY_CLASS,
   SIDEBAR_COLLAPSED_LOGO_WRAPPER_CLASS,
@@ -265,6 +268,16 @@ export function SidebarRailBody({
             )}
           />
         )}
+        {/* PROTOTYPE: Factories wireframe entry. */}
+        <SidebarNavLink
+          to={FACTORIES_PATH}
+          end
+          // eslint-disable-next-line i18next/no-literal-string -- PROTOTYPE copy
+          label="Factories"
+          testId="sidebar-factories-link"
+          collapsed={collapsed}
+          icon={<FactoryIcon width={ICON_SIZE} height={ICON_SIZE} />}
+        />
         {canvasExtensionPages.map((page) => (
           <SidebarNavLink
             key={`${page.extension.name}:${page.contribution.id}`}
@@ -281,6 +294,8 @@ export function SidebarRailBody({
           />
         ))}
       </nav>
+
+      <SidebarFactoriesSection collapsed={collapsed} />
 
       <SidebarConversationList collapsed={collapsed} />
 
