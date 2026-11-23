@@ -3,7 +3,7 @@ import React from "react";
 import { ChevronRight } from "lucide-react";
 import { useNavigation } from "#/context/navigation-context";
 import {
-  ATTENTION_ITEMS,
+  BLOCKER_PATTERNS,
   THROUGHPUT,
   WORK_ITEMS,
   WORK_STAGES,
@@ -17,7 +17,6 @@ import {
   Badge,
   Bars,
   Button,
-  Callout,
   Card,
   CardTitle,
   FilterChips,
@@ -26,7 +25,6 @@ import {
   Row,
   SectionTitle,
   Stat,
-  Table,
   useFactoryDrawer,
 } from "../factory-ui";
 
@@ -61,9 +59,9 @@ function useOpenWorkItem(factory: Factory) {
           evidence before handoff.
         </p>
         <div className="mt-4 text-2xs font-semibold uppercase tracking-wider text-muted">
-          Assigned worker
+          Assigned agent
         </div>
-        <p className="mt-1 text-sm text-content">{item.worker}</p>
+        <p className="mt-1 text-sm text-content">{item.agent}</p>
         <div className="my-4 h-px bg-border" />
         <Button
           variant="primary"
@@ -78,7 +76,7 @@ function useOpenWorkItem(factory: Factory) {
     );
 }
 
-function useOpenAttention(factory: Factory) {
+export function useOpenAttention(factory: Factory) {
   const { open, demo, close } = useFactoryDrawer();
   const { navigate } = useNavigation();
   return (a: AttentionItem) =>
@@ -125,7 +123,6 @@ function useOpenAttention(factory: Factory) {
 export function OverviewPage({ factory }: FactoryPageProps) {
   const { navigate } = useNavigation();
   const { demo } = useFactoryDrawer();
-  const openAttention = useOpenAttention(factory);
   return (
     <>
       <PageHeading
@@ -141,9 +138,9 @@ export function OverviewPage({ factory }: FactoryPageProps) {
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Stat label="Active work" value="9" hint="Across 2 repositories" />
         <Stat
-          label="Needs a decision"
-          value="3"
-          hint="2 approvals · 1 question"
+          label="Blocked"
+          value="5"
+          hint="17 auto-resolved by rules this week"
         />
         <Stat label="PRs merged" value="27" hint="+18% against prior period" />
         <Stat
@@ -162,16 +159,46 @@ export function OverviewPage({ factory }: FactoryPageProps) {
           </div>
         </Card>
         <Card>
-          <CardTitle>Factory attention</CardTitle>
-          {ATTENTION_ITEMS.map((a) => (
-            <Row key={a.id} onClick={() => openAttention(a)}>
-              <div>
-                <div className="font-medium text-content">{a.title}</div>
-                <Muted className="mt-1">{a.kind}</Muted>
-              </div>
-              <Badge tone="warn">{a.action}</Badge>
-            </Row>
-          ))}
+          <div className="mb-3 flex items-center">
+            <h3 className="text-sm font-semibold text-content">Flow health</h3>
+            <div className="flex-1" />
+            <Button
+              size="sm"
+              onClick={() => navigate(factoryPath(factory.id, "operator"))}
+            >
+              Operator view →
+            </Button>
+          </div>
+          <div className="mb-1 flex items-baseline gap-2">
+            <span className="text-2xl font-semibold text-content">87%</span>
+            <Muted>of work moved without a person this week</Muted>
+          </div>
+          {BLOCKER_PATTERNS.filter((p) => p.blockedNow > 0)
+            .slice(0, 3)
+            .map((p) => (
+              <Row
+                key={p.id}
+                onClick={() => navigate(factoryPath(factory.id, "operator"))}
+              >
+                <div>
+                  <div className="font-medium text-content">{p.cause}</div>
+                  <Muted className="mt-1">
+                    {p.blockedNow} blocked · {p.last7d} in 7 days
+                  </Muted>
+                </div>
+                <Badge
+                  tone={
+                    p.coverage === "Covered"
+                      ? "good"
+                      : p.coverage === "Partial"
+                        ? "warn"
+                        : "bad"
+                  }
+                >
+                  {p.coverage}
+                </Badge>
+              </Row>
+            ))}
         </Card>
       </div>
       <SectionTitle
@@ -285,60 +312,6 @@ export function QueuePage({ factory }: FactoryPageProps) {
           );
         })}
       </div>
-    </>
-  );
-}
-
-export function AttentionPage({ factory }: FactoryPageProps) {
-  const { demo } = useFactoryDrawer();
-  const openAttention = useOpenAttention(factory);
-  return (
-    <>
-      <PageHeading
-        eyebrow={eyebrow(factory)}
-        title="Needs your attention"
-        subtitle="Resolve decisions and unblock work without opening individual runs."
-        actions={
-          <Button onClick={() => demo("Completed decisions")}>
-            View completed
-          </Button>
-        }
-      />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="Waiting on you" value="3" />
-        <Stat label="Approval requests" value="2" />
-        <Stat label="Unanswered questions" value="1" />
-      </div>
-      <SectionTitle>Decisions waiting on you</SectionTitle>
-      <Table<AttentionItem>
-        rows={ATTENTION_ITEMS}
-        rowKey={(r) => r.id}
-        onRowClick={openAttention}
-        columns={[
-          {
-            header: "Request",
-            width: "44%",
-            render: (r) => <span className="font-medium">{r.title}</span>,
-          },
-          {
-            header: "Type",
-            render: (r) => <Badge tone="warn">{r.kind}</Badge>,
-          },
-          { header: "Origin", render: (r) => r.workItemId },
-          { header: "Age", render: (r) => r.age },
-          {
-            header: "Action",
-            render: (r) => (
-              <span className="text-link underline">{r.action}</span>
-            ),
-          },
-        ]}
-      />
-      <Callout>
-        Design rule: an approval is attached to a work item and a Blueprint
-        gate, not to a standalone chat message. A reviewer can see the evidence
-        and downstream impact before deciding.
-      </Callout>
     </>
   );
 }

@@ -17,14 +17,13 @@ import {
 } from "#/components/features/factories/factory-ui";
 import {
   type FactoryPageProps,
-  AttentionPage,
   OverviewPage,
   QueuePage,
 } from "#/components/features/factories/pages/overview-pages";
 import {
   AutomationsPage,
   BlueprintPage,
-  WorkersPage,
+  AgentsPage,
 } from "#/components/features/factories/pages/build-pages";
 import {
   BenchmarksPage,
@@ -36,6 +35,7 @@ import {
   SettingsPage,
   WorkItemPage,
 } from "#/components/features/factories/pages/detail-pages";
+import { OperatorPage } from "#/components/features/factories/pages/operator-page";
 import { useNavigation } from "#/context/navigation-context";
 
 const SECTION_PAGES: Record<
@@ -44,10 +44,10 @@ const SECTION_PAGES: Record<
 > = {
   overview: OverviewPage,
   queue: QueuePage,
-  attention: AttentionPage,
+  operator: OperatorPage,
   blueprint: BlueprintPage,
   automations: AutomationsPage,
-  workers: WorkersPage,
+  agents: AgentsPage,
   runs: RunsPage,
   quality: QualityPage,
   benchmarks: BenchmarksPage,

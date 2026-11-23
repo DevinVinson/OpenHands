@@ -51,7 +51,7 @@ export function RunsPage({ factory }: FactoryPageProps) {
         (filter === "Active" &&
           (r.status === "Working" || r.status === "Waiting")) ||
         r.status === filter) &&
-      `${r.id} ${r.task} ${r.worker}`
+      `${r.id} ${r.task} ${r.agent}`
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
@@ -97,7 +97,7 @@ export function RunsPage({ factory }: FactoryPageProps) {
             width: "27%",
             render: (r) => <span className="font-medium">{r.task}</span>,
           },
-          { header: "Worker", render: (r) => r.worker },
+          { header: "Agent", render: (r) => r.agent },
           {
             header: "Status",
             render: (r) => <Badge tone={runTone(r.status)}>{r.status}</Badge>,
@@ -108,7 +108,7 @@ export function RunsPage({ factory }: FactoryPageProps) {
       />
       <Callout>
         Runs are executions, not work items. One work item can contain a
-        coordinating run and several child worker runs. Keep the distinction
+        coordinating run and several child agent runs. Keep the distinction
         visible in navigation and reporting.
       </Callout>
     </>
@@ -171,7 +171,7 @@ export function QualityPage({ factory }: FactoryPageProps) {
       <Card>
         {[
           [
-            "Add test-artifact requirement to QA worker",
+            "Add test-artifact requirement to QA agent",
             "Proposed by evaluator",
             "Needs review",
           ],
@@ -321,7 +321,7 @@ export function BenchmarksPage({ factory }: FactoryPageProps) {
             header: "Suite",
             render: (r) => <span className="font-medium">{r[0]}</span>,
           },
-          { header: "Assigned worker", render: (r) => r[1] },
+          { header: "Assigned agent", render: (r) => r[1] },
           { header: "Tasks", render: (r) => r[2] },
           { header: "Last run", render: (r) => r[3] },
         ]}

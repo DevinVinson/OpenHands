@@ -11,10 +11,10 @@ export const FACTORIES_PATH = "/factories";
 export type FactorySection =
   | "overview"
   | "queue"
-  | "attention"
+  | "operator"
   | "blueprint"
   | "automations"
-  | "workers"
+  | "agents"
   | "runs"
   | "quality"
   | "benchmarks"
@@ -54,7 +54,7 @@ export const FACTORY_NAV_GROUPS: FactoryNavGroup[] = [
     items: [
       { section: "overview", label: "Overview" },
       { section: "queue", label: "Work queue", count: 9 },
-      { section: "attention", label: "Needs attention", count: 3 },
+      { section: "operator", label: "Operator view", count: 5 },
     ],
   },
   {
@@ -62,7 +62,7 @@ export const FACTORY_NAV_GROUPS: FactoryNavGroup[] = [
     items: [
       { section: "blueprint", label: "Workflow blueprint" },
       { section: "automations", label: "Automations", count: 6 },
-      { section: "workers", label: "Workers", count: 5 },
+      { section: "agents", label: "Agents", count: 5 },
     ],
   },
   {
@@ -120,7 +120,7 @@ export interface WorkItem {
   stage: WorkStage;
   priority: Priority;
   age: string;
-  worker: string;
+  agent: string;
 }
 
 export const WORK_ITEMS: WorkItem[] = [
@@ -203,7 +203,7 @@ export const WORK_ITEMS: WorkItem[] = [
   stage: stage as WorkStage,
   priority: priority as Priority,
   age,
-  worker:
+  agent:
     stage === "build"
       ? "Implementation Agent"
       : stage === "review"
@@ -264,7 +264,144 @@ export const ATTENTION_ITEMS: AttentionItem[] = [
   },
 ];
 
-export interface Worker {
+export type RuleCoverage = "Covered" | "Partial" | "No rule";
+
+/**
+ * A recurring reason work stops moving, grouped by cause rather than by
+ * individual work item, so it can be resolved once with a rule.
+ */
+export interface BlockerPattern {
+  id: string;
+  cause: string;
+  stage: string;
+  blockedNow: number;
+  last7d: number;
+  autoResolved: number;
+  coverage: RuleCoverage;
+  ruleId?: string;
+  example: string;
+  suggestion: string;
+}
+
+export const BLOCKER_PATTERNS: BlockerPattern[] = [
+  {
+    id: "flaky-ci",
+    cause: "Flaky CI failure",
+    stage: "Verify",
+    blockedNow: 1,
+    last7d: 14,
+    autoResolved: 12,
+    coverage: "Covered",
+    ruleId: "retry-flaky",
+    example: "SF-1027 · Regression verification for CI failures",
+    suggestion: "Rule is working. 2 of 14 escalated after retries ran out.",
+  },
+  {
+    id: "spec-approval",
+    cause: "Spec waiting on approval gate",
+    stage: "Approval",
+    blockedNow: 2,
+    last7d: 9,
+    autoResolved: 0,
+    coverage: "No rule",
+    example: "SF-1036 · Document organization permissions",
+    suggestion:
+      "8 of the last 9 low-risk documentation specs were approved unchanged. Auto-approve low-risk docs specs and notify the owner.",
+  },
+  {
+    id: "ambiguous-req",
+    cause: "Ambiguous requirements",
+    stage: "Plan",
+    blockedNow: 1,
+    last7d: 6,
+    autoResolved: 4,
+    coverage: "Partial",
+    ruleId: "ask-author",
+    example: "SF-1048 · Investigate sporadic auth timeouts",
+    suggestion:
+      "Planner asks the issue author, but nothing happens if they don't reply. Add an escalation after 4h.",
+  },
+  {
+    id: "missing-access",
+    cause: "Missing repository or secret access",
+    stage: "Implement",
+    blockedNow: 0,
+    last7d: 3,
+    autoResolved: 0,
+    coverage: "No rule",
+    example: "SF-1018 · Update webhook payload schema",
+    suggestion:
+      "Request access from the repository owner automatically and park the item until it's granted.",
+  },
+  {
+    id: "budget",
+    cause: "Run exceeded cost budget",
+    stage: "Implement",
+    blockedNow: 1,
+    last7d: 2,
+    autoResolved: 1,
+    coverage: "Covered",
+    ruleId: "budget-split",
+    example: "RUN-408 · Failed CI workflow",
+    suggestion: "Rule splits the work item and re-plans when a run hits $5.",
+  },
+];
+
+export interface ResolutionRule {
+  id: string;
+  name: string;
+  when: string;
+  then: string;
+  escalate: string;
+  enabled: boolean;
+  hits7d: number;
+  successRate: string;
+}
+
+export const RESOLUTION_RULES: ResolutionRule[] = [
+  {
+    id: "retry-flaky",
+    name: "Retry flaky CI",
+    when: "CI fails on a test marked flaky, or passes on main",
+    then: "Re-run up to 2×, then send back to Implementation with the logs",
+    escalate: "After 3 failures → #factory-ops",
+    enabled: true,
+    hits7d: 14,
+    successRate: "86%",
+  },
+  {
+    id: "ask-author",
+    name: "Clarify with issue author",
+    when: "Planner confidence < 0.6 on requirements",
+    then: "Planner posts questions on the source issue and waits",
+    escalate: "Not set",
+    enabled: true,
+    hits7d: 6,
+    successRate: "67%",
+  },
+  {
+    id: "budget-split",
+    name: "Split over-budget work",
+    when: "A run's estimated cost passes $5",
+    then: "Pause, split the work item and re-plan smaller steps",
+    escalate: "Second overrun → factory owner",
+    enabled: true,
+    hits7d: 2,
+    successRate: "50%",
+  },
+  {
+    id: "stale-review",
+    name: "Nudge stale reviews",
+    when: "A PR waits in Review for more than 24h",
+    then: "Re-request review from CODEOWNERS and post in Slack",
+    escalate: "After 48h → engineering manager",
+    enabled: false,
+    hits7d: 0,
+    successRate: "—",
+  },
+];
+
+export interface Agent {
   id: string;
   name: string;
   description: string;
@@ -273,7 +410,7 @@ export interface Worker {
   active: number;
 }
 
-export const WORKERS: Worker[] = [
+export const AGENTS: Agent[] = [
   {
     id: "triage",
     name: "Triage Agent",
@@ -319,7 +456,7 @@ export const WORKERS: Worker[] = [
 export interface AutomationRecord {
   name: string;
   trigger: string;
-  worker: string;
+  agent: string;
   enabled: boolean;
   runs: number;
 }
@@ -328,42 +465,42 @@ export const AUTOMATIONS: AutomationRecord[] = [
   {
     name: "Issue opened",
     trigger: "GitHub · issue opened",
-    worker: "Triage Agent",
+    agent: "Triage Agent",
     enabled: true,
     runs: 26,
   },
   {
     name: "PR opened or updated",
     trigger: "GitHub · PR event",
-    worker: "Review Agent",
+    agent: "Review Agent",
     enabled: true,
     runs: 18,
   },
   {
     name: "Nightly dependency scan",
     trigger: "Schedule · 02:00 UTC",
-    worker: "Triage Agent",
+    agent: "Triage Agent",
     enabled: true,
     runs: 7,
   },
   {
     name: "Failed CI workflow",
     trigger: "GitHub · workflow failed",
-    worker: "Implementation Agent",
+    agent: "Implementation Agent",
     enabled: true,
     runs: 14,
   },
   {
     name: "Incident alert",
     trigger: "Webhook · incident.created",
-    worker: "Triage Agent",
+    agent: "Triage Agent",
     enabled: true,
     runs: 4,
   },
   {
     name: "Weekly improvement digest",
     trigger: "Schedule · Monday 08:00",
-    worker: "Planner",
+    agent: "Planner",
     enabled: false,
     runs: 1,
   },
@@ -376,7 +513,7 @@ export interface RunRecord {
   id: string;
   task: string;
   workItemId: string;
-  worker: string;
+  agent: string;
   status: RunStatus;
   duration: string;
   cost: string;
@@ -387,7 +524,7 @@ export const RUNS: RunRecord[] = [
     id: "RUN-411",
     task: "Implement accessible labels",
     workItemId: "SF-1023",
-    worker: "Implementation Agent",
+    agent: "Implementation Agent",
     status: "Working",
     duration: "6m",
     cost: "$1.82",
@@ -396,7 +533,7 @@ export const RUNS: RunRecord[] = [
     id: "RUN-410",
     task: "Plan retry policy",
     workItemId: "SF-1036",
-    worker: "Planner",
+    agent: "Planner",
     status: "Waiting",
     duration: "14m",
     cost: "$0.62",
@@ -405,7 +542,7 @@ export const RUNS: RunRecord[] = [
     id: "RUN-409",
     task: "Review token renewal PR",
     workItemId: "SF-1013",
-    worker: "Review Agent",
+    agent: "Review Agent",
     status: "Complete",
     duration: "8m",
     cost: "$0.49",
@@ -414,7 +551,7 @@ export const RUNS: RunRecord[] = [
     id: "RUN-408",
     task: "Failed CI workflow",
     workItemId: "SF-1027",
-    worker: "Implementation Agent",
+    agent: "Implementation Agent",
     status: "Blocked",
     duration: "24m",
     cost: "$3.06",
@@ -423,7 +560,7 @@ export const RUNS: RunRecord[] = [
     id: "RUN-407",
     task: "Investigate auth regression",
     workItemId: "SF-1048",
-    worker: "Triage Agent",
+    agent: "Triage Agent",
     status: "Complete",
     duration: "3m",
     cost: "$0.21",
@@ -432,7 +569,7 @@ export const RUNS: RunRecord[] = [
     id: "RUN-406",
     task: "Test API pagination change",
     workItemId: "SF-1018",
-    worker: "QA Agent",
+    agent: "QA Agent",
     status: "Complete",
     duration: "10m",
     cost: "$0.75",
@@ -446,17 +583,17 @@ export function findRun(id: string | undefined) {
 export interface BlueprintStage {
   num: string;
   name: string;
-  worker: string;
+  agent: string;
   gate?: boolean;
 }
 
 export const BLUEPRINT_STAGES: BlueprintStage[] = [
-  { num: "01", name: "Triage", worker: "Triage Agent" },
-  { num: "02", name: "Plan", worker: "Planner" },
-  { num: "03", name: "Approval", worker: "Human gate", gate: true },
-  { num: "04", name: "Implement", worker: "Implementation Agent" },
-  { num: "05", name: "Verify", worker: "QA Agent" },
-  { num: "06", name: "Review", worker: "Review Agent" },
+  { num: "01", name: "Triage", agent: "Triage Agent" },
+  { num: "02", name: "Plan", agent: "Planner" },
+  { num: "03", name: "Approval", agent: "Human gate", gate: true },
+  { num: "04", name: "Implement", agent: "Implementation Agent" },
+  { num: "05", name: "Verify", agent: "QA Agent" },
+  { num: "06", name: "Review", agent: "Review Agent" },
 ];
 
 export const THROUGHPUT = [
@@ -467,8 +604,8 @@ export const THROUGHPUT = [
 export const DEFINITION_FILES = [
   "factory.yaml",
   "blueprint.yaml",
-  "workers/triage.md",
-  "workers/implementation.md",
+  "agents/triage.md",
+  "agents/implementation.md",
   "automations/pr-review.yaml",
   "scorers/quality.yaml",
 ];
@@ -487,7 +624,7 @@ blueprint:
     - verification
     - review
 
-workers:
+agents:
   - triage
   - planner
   - implementation

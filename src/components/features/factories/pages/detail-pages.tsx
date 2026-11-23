@@ -79,7 +79,7 @@ export function WorkItemPage({
         ) : null}
         <Muted>{item.source}</Muted>
         <div className="flex-1" />
-        <Badge>Owned by {item.worker}</Badge>
+        <Badge>Owned by {item.agent}</Badge>
       </div>
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="min-w-0 flex-1">
@@ -127,7 +127,7 @@ export function WorkItemPage({
             <CardTitle>Next action</CardTitle>
             <Badge tone="warn">Waiting for approval</Badge>
             <p className="my-3 text-sm text-content">
-              Review the implementation plan before the build worker begins
+              Review the implementation plan before the build agent begins
               writing code.
             </p>
             <Button
@@ -145,19 +145,19 @@ export function WorkItemPage({
                 "Implementation plan",
                 "Risk analysis",
                 "Source issue",
-                "Worker session",
+                "Agent session",
               ]}
             />
           </Card>
           <Card className="mt-4">
-            <CardTitle>Worker runs</CardTitle>
+            <CardTitle>Agent runs</CardTitle>
             {shownRuns.map((r) => (
               <Row
                 key={r.id}
                 onClick={() => navigate(factoryRunPath(factory.id, r.id))}
               >
                 <span className="text-content">
-                  {r.id} · {r.worker}
+                  {r.id} · {r.agent}
                 </span>
                 <Badge tone={runTone(r.status)}>{r.status}</Badge>
               </Row>
@@ -195,7 +195,7 @@ export function RunDetailPage({
             >
               {run.workItemId}
             </button>{" "}
-            / {run.worker} / started {run.duration} ago
+            / {run.agent} / started {run.duration} ago
           </>
         }
         actions={<Button onClick={() => demo("Stop run")}>Stop run</Button>}
@@ -243,7 +243,7 @@ export function RunDetailPage({
             />
           </Card>
           <Card className="mt-4">
-            <CardTitle>Latest worker output</CardTitle>
+            <CardTitle>Latest agent output</CardTitle>
             <CodeBox>{`$ npm run test:ui
 ✓ 42 component tests passed
 ✓ keyboard navigation test passed
@@ -256,8 +256,8 @@ Preparing change summary and PR artifacts…`}</CodeBox>
         <div className="w-full shrink-0 lg:w-72">
           <Card>
             <CardTitle>Run context</CardTitle>
-            <Muted>Worker</Muted>
-            <p className="mb-3 mt-0.5 text-sm text-content">{run.worker}</p>
+            <Muted>Agent</Muted>
+            <p className="mb-3 mt-0.5 text-sm text-content">{run.agent}</p>
             <Muted>Harness / model</Muted>
             <p className="mb-3 mt-0.5 text-sm text-content">
               OpenHands agent · coding-model
@@ -269,7 +269,7 @@ Preparing change summary and PR artifacts…`}</CodeBox>
               variant="primary"
               onClick={() => navigate("/conversations")}
             >
-              Open worker conversation
+              Open agent conversation
             </Button>
           </Card>
           <Card className="mt-4">
@@ -420,10 +420,10 @@ export function SettingsPage({ factory }: FactoryPageProps) {
       {tab === "permissions" ? (
         <div className="grid gap-4 md:grid-cols-2">
           {[
-            ["Read-only worker", "Inspect and search repositories"],
-            ["Implementation worker", "Write branches and create PRs"],
-            ["Review worker", "Read diffs and create reviews"],
-            ["QA worker", "Run tests and create artifacts"],
+            ["Read-only agent", "Inspect and search repositories"],
+            ["Implementation agent", "Write branches and create PRs"],
+            ["Review agent", "Read diffs and create reviews"],
+            ["QA agent", "Run tests and create artifacts"],
           ].map(([n, d]) => (
             <Card key={n} onClick={() => demo(n)}>
               <CardTitle>{n}</CardTitle>

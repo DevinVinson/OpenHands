@@ -4,7 +4,7 @@ import { ChevronRight, Factory as FactoryIcon, Plus } from "lucide-react";
 import { useNavigation } from "#/context/navigation-context";
 import { useFactoryStore } from "#/components/features/factories/factory-store";
 import {
-  WORKERS,
+  AGENTS,
   WORK_ITEMS,
   factoryPath,
 } from "#/components/features/factories/factory-data";
@@ -79,7 +79,7 @@ export default function FactoriesListRoute() {
               <div className="flex gap-2 text-xs text-muted">
                 <span>{f.repositories.length} repositories</span>
                 <span>·</span>
-                <span>{WORKERS.length} workers</span>
+                <span>{AGENTS.length} agents</span>
                 <span>·</span>
                 <span>{WORK_ITEMS.length} work items</span>
               </div>

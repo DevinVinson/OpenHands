@@ -4,10 +4,10 @@ import { cn } from "#/utils/utils";
 import {
   AUTOMATIONS,
   BLUEPRINT_STAGES,
-  WORKERS,
+  AGENTS,
   type AutomationRecord,
   type BlueprintStage,
-  type Worker,
+  type Agent,
 } from "../factory-data";
 import {
   Badge,
@@ -34,8 +34,8 @@ export function BlueprintPage({ factory }: FactoryPageProps) {
     open(
       `${s.name} ${s.gate ? "gate" : "stage"}`,
       <>
-        <Field label={s.gate ? "Approver" : "Assigned worker"}>
-          {s.gate ? "Factory maintainers" : s.worker}
+        <Field label={s.gate ? "Approver" : "Assigned agent"}>
+          {s.gate ? "Factory maintainers" : s.agent}
         </Field>
         <Field label="Procedure">
           <div className="min-h-24 text-muted">
@@ -108,7 +108,7 @@ export function BlueprintPage({ factory }: FactoryPageProps) {
                 <div className="mb-1.5 mt-2 text-sm font-semibold text-content">
                   {s.name}
                 </div>
-                <div className="text-2xs text-muted">{s.worker}</div>
+                <div className="text-2xs text-muted">{s.agent}</div>
               </button>
             </React.Fragment>
           ))}
@@ -117,7 +117,7 @@ export function BlueprintPage({ factory }: FactoryPageProps) {
           <div className="max-w-sm">
             <Note>
               ↶ Review findings can route work back to implementation,
-              preserving the worker conversation and attached evidence.
+              preserving the agent conversation and attached evidence.
             </Note>
           </div>
           <div className="max-w-sm">
@@ -163,7 +163,7 @@ export function AutomationsPage({ factory }: FactoryPageProps) {
           <div>Branch: main</div>
         </Field>
         <Field label="Target">
-          {a.worker} → enters Blueprint at <b>Triage</b>
+          {a.agent} → enters Blueprint at <b>Triage</b>
         </Field>
         <div className="mt-4 text-xs font-semibold text-muted">Execution</div>
         <p className="mt-1 text-sm text-content">
@@ -200,7 +200,7 @@ export function AutomationsPage({ factory }: FactoryPageProps) {
             render: (r) => <span className="font-medium">{r.name}</span>,
           },
           { header: "Trigger", render: (r) => r.trigger },
-          { header: "Target worker", render: (r) => r.worker },
+          { header: "Target agent", render: (r) => r.agent },
           {
             header: "Status",
             render: (r) => (
@@ -251,10 +251,10 @@ export function AutomationsPage({ factory }: FactoryPageProps) {
   );
 }
 
-export function WorkersPage({ factory }: FactoryPageProps) {
+export function AgentsPage({ factory }: FactoryPageProps) {
   const { open, demo } = useFactoryDrawer();
 
-  const openWorker = (w: Worker) =>
+  const openAgent = (w: Agent) =>
     open(
       w.name,
       <>
@@ -275,8 +275,8 @@ export function WorkersPage({ factory }: FactoryPageProps) {
           </div>
         </Field>
         <div className="my-4 h-px bg-border" />
-        <Button variant="primary" onClick={() => demo("Edit worker")}>
-          Edit worker
+        <Button variant="primary" onClick={() => demo("Edit agent")}>
+          Edit agent
         </Button>
       </>,
     );
@@ -285,17 +285,17 @@ export function WorkersPage({ factory }: FactoryPageProps) {
     <>
       <PageHeading
         eyebrow={eyebrow(factory)}
-        title="Workers"
+        title="Agents"
         subtitle="Reusable agent profiles with explicit responsibilities and resource scopes."
         actions={
-          <Button variant="primary" onClick={() => demo("New worker")}>
-            New worker
+          <Button variant="primary" onClick={() => demo("New agent")}>
+            New agent
           </Button>
         }
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {WORKERS.map((w) => (
-          <Card key={w.id} onClick={() => openWorker(w)} className="min-h-48">
+        {AGENTS.map((w) => (
+          <Card key={w.id} onClick={() => openAgent(w)} className="min-h-48">
             <div className="flex items-center">
               <div className="grid size-9 place-items-center rounded-lg border border-border bg-surface-raised text-xs font-bold text-muted">
                 {w.name
