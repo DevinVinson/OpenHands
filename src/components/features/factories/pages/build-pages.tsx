@@ -1,10 +1,12 @@
 /* eslint-disable i18next/no-literal-string -- PROTOTYPE: wireframe copy, not yet localized. */
 import React from "react";
 import { cn } from "#/utils/utils";
+import { useNavigation } from "#/context/navigation-context";
 import {
   AUTOMATIONS,
   BLUEPRINT_STAGES,
   AGENTS,
+  factoryAgentPath,
   type AutomationRecord,
   type BlueprintStage,
   type Agent,
@@ -252,34 +254,9 @@ export function AutomationsPage({ factory }: FactoryPageProps) {
 }
 
 export function AgentsPage({ factory }: FactoryPageProps) {
-  const { open, demo } = useFactoryDrawer();
-
-  const openAgent = (w: Agent) =>
-    open(
-      w.name,
-      <>
-        <p className="text-sm text-content">{w.description}</p>
-        <Field label="Model / harness">{w.model} · OpenHands agent</Field>
-        <Field label="Permissions">{w.scope}</Field>
-        <div className="mt-4 text-xs font-semibold text-muted">
-          Tools & integrations
-        </div>
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {["GitHub", "Issues", "Repository workspace", "MCP"].map((p) => (
-            <Pill key={p}>{p}</Pill>
-          ))}
-        </div>
-        <Field label="Operating instructions">
-          <div className="min-h-24 text-muted">
-            Role-specific system instructions, skills and task boundaries.
-          </div>
-        </Field>
-        <div className="my-4 h-px bg-border" />
-        <Button variant="primary" onClick={() => demo("Edit agent")}>
-          Edit agent
-        </Button>
-      </>,
-    );
+  const { demo } = useFactoryDrawer();
+  const { navigate } = useNavigation();
+  const openAgent = (w: Agent) => navigate(factoryAgentPath(factory.id, w.id));
 
   return (
     <>
@@ -314,6 +291,9 @@ export function AgentsPage({ factory }: FactoryPageProps) {
             <div className="mt-3 flex flex-wrap gap-1.5">
               <Pill>{w.model}</Pill>
               <Pill>{w.scope}</Pill>
+              <Pill>
+                <span className="font-mono">{w.profile.name}</span>
+              </Pill>
             </div>
           </Card>
         ))}

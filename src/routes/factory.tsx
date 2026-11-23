@@ -35,6 +35,7 @@ import {
   SettingsPage,
   WorkItemPage,
 } from "#/components/features/factories/pages/detail-pages";
+import { AgentProfilePage } from "#/components/features/factories/pages/agent-profile-page";
 import { OperatorPage } from "#/components/features/factories/pages/operator-page";
 import { useNavigation } from "#/context/navigation-context";
 
@@ -86,6 +87,8 @@ export default function FactoryRoute() {
     );
   } else if (first === "work") {
     content = <WorkItemPage factory={factory} itemId={second} />;
+  } else if (first === "agents" && second) {
+    content = <AgentProfilePage factory={factory} agentId={second} />;
   } else if (first === "runs" && second) {
     content = <RunDetailPage factory={factory} runId={second} />;
   } else {

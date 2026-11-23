@@ -408,6 +408,12 @@ export interface Agent {
   model: string;
   scope: string;
   active: number;
+  /** Agent profile backing this agent: it sets the agent's scope. */
+  profile: {
+    name: string;
+    tools: string[];
+    instructions: string;
+  };
 }
 
 export const AGENTS: Agent[] = [
@@ -418,6 +424,12 @@ export const AGENTS: Agent[] = [
     model: "fast-model",
     scope: "Read-only",
     active: 3,
+    profile: {
+      name: "factory-triage",
+      tools: ["terminal", "task_tracker"],
+      instructions:
+        "Classify each incoming item by type, risk and affected repository. Never modify files. Route to the Blueprint stage that matches the classification.",
+    },
   },
   {
     id: "planner",
@@ -426,6 +438,12 @@ export const AGENTS: Agent[] = [
     model: "frontier-model",
     scope: "Read-only",
     active: 2,
+    profile: {
+      name: "factory-planner",
+      tools: ["terminal", "file_editor", "task_tracker", "browser_tool_set"],
+      instructions:
+        "Produce a written spec with acceptance criteria and open questions. Ask the issue author when requirements are ambiguous. Do not write code.",
+    },
   },
   {
     id: "implementation",
@@ -434,6 +452,12 @@ export const AGENTS: Agent[] = [
     model: "coding-model",
     scope: "Read/write",
     active: 4,
+    profile: {
+      name: "factory-implementation",
+      tools: ["terminal", "file_editor", "task_tracker"],
+      instructions:
+        "Implement the approved spec on an agent/* branch. Add or update tests for every behavior change and open a draft PR with a change summary.",
+    },
   },
   {
     id: "qa",
@@ -442,6 +466,12 @@ export const AGENTS: Agent[] = [
     model: "frontier-model",
     scope: "Test/containers",
     active: 1,
+    profile: {
+      name: "factory-qa",
+      tools: ["terminal", "browser_tool_set", "task_tracker"],
+      instructions:
+        "Run the full test suite and exercise the change in a browser. Attach logs and screenshots as evidence. Fail the stage if evidence is missing.",
+    },
   },
   {
     id: "review",
@@ -450,8 +480,22 @@ export const AGENTS: Agent[] = [
     model: "reasoning-model",
     scope: "Review-only",
     active: 2,
+    profile: {
+      name: "factory-review",
+      tools: ["terminal", "file_editor"],
+      instructions:
+        "Review the PR independently of the implementer. Flag risk, scope creep and missing tests. Never push commits to the branch.",
+    },
   },
 ];
+
+export function findAgent(id: string | undefined) {
+  return AGENTS.find((a) => a.id === id);
+}
+
+export function factoryAgentPath(factoryId: string, agentId: string) {
+  return `${factoryPath(factoryId, "agents")}/${encodeURIComponent(agentId)}`;
+}
 
 export interface AutomationRecord {
   name: string;
