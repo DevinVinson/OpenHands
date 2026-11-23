@@ -18,7 +18,6 @@ import {
 import {
   type FactoryPageProps,
   OverviewPage,
-  QueuePage,
 } from "#/components/features/factories/pages/overview-pages";
 import {
   AutomationsPage,
@@ -33,9 +32,13 @@ import {
 import {
   RunDetailPage,
   SettingsPage,
-  WorkItemPage,
 } from "#/components/features/factories/pages/detail-pages";
 import { AgentProfilePage } from "#/components/features/factories/pages/agent-profile-page";
+import {
+  ConversationsPage,
+  RefDetailPage,
+  WorkStreamPage,
+} from "#/components/features/factories/pages/stream-pages";
 import { OperatorPage } from "#/components/features/factories/pages/operator-page";
 import { useNavigation } from "#/context/navigation-context";
 
@@ -44,7 +47,8 @@ const SECTION_PAGES: Record<
   (props: FactoryPageProps) => React.ReactElement
 > = {
   overview: OverviewPage,
-  queue: QueuePage,
+  stream: WorkStreamPage,
+  conversations: ConversationsPage,
   operator: OperatorPage,
   blueprint: BlueprintPage,
   automations: AutomationsPage,
@@ -66,6 +70,7 @@ export default function FactoryRoute() {
   const { factoryId, "*": splat = "" } = useParams();
   const factory = useFactory(factoryId);
   const setExpanded = useFactoryStore((s) => s.setExpanded);
+  const deleteFactory = useFactoryStore((s) => s.deleteFactory);
   const { navigate } = useNavigation();
   const [first, second] = splat.split("/").filter(Boolean);
 
@@ -85,8 +90,8 @@ export default function FactoryRoute() {
         </div>
       </div>
     );
-  } else if (first === "work") {
-    content = <WorkItemPage factory={factory} itemId={second} />;
+  } else if (first === "stream" && second) {
+    content = <RefDetailPage factory={factory} refId={second} />;
   } else if (first === "agents" && second) {
     content = <AgentProfilePage factory={factory} agentId={second} />;
   } else if (first === "runs" && second) {
@@ -94,7 +99,18 @@ export default function FactoryRoute() {
   } else {
     const section = isFactorySection(first) ? first : DEFAULT_FACTORY_SECTION;
     const Page = SECTION_PAGES[section];
-    content = <Page factory={factory} />;
+    content =
+      section === "settings" ? (
+        <SettingsPage
+          factory={factory}
+          onDelete={() => {
+            deleteFactory(factory.id);
+            navigate(FACTORIES_PATH);
+          }}
+        />
+      ) : (
+        <Page factory={factory} />
+      );
   }
 
   return (

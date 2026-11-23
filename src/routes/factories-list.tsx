@@ -5,7 +5,7 @@ import { useNavigation } from "#/context/navigation-context";
 import { useFactoryStore } from "#/components/features/factories/factory-store";
 import {
   AGENTS,
-  WORK_ITEMS,
+  EXTERNAL_REFS,
   factoryPath,
 } from "#/components/features/factories/factory-data";
 import {
@@ -21,6 +21,7 @@ import { CreateFactoryModal } from "#/components/features/factories/create-facto
 export default function FactoriesListRoute() {
   const factories = useFactoryStore((s) => s.factories);
   const setExpanded = useFactoryStore((s) => s.setExpanded);
+  const reset = useFactoryStore((s) => s.reset);
   const { navigate } = useNavigation();
   const [creating, setCreating] = React.useState(false);
 
@@ -39,16 +40,44 @@ export default function FactoriesListRoute() {
             </Button>
           }
         />
-        <SectionTitle
-          right={
-            <Muted>
-              {factories.length}{" "}
-              {factories.length === 1 ? "factory" : "factories"}
-            </Muted>
-          }
-        >
-          Your factories
-        </SectionTitle>
+        {factories.length === 0 ? (
+          <div
+            data-testid="factories-empty"
+            className="mt-6 rounded-xl border border-dashed border-border px-6 py-14 text-center"
+          >
+            <div className="mx-auto grid size-12 place-items-center rounded-xl bg-primary/10 text-primary">
+              <FactoryIcon className="size-6" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-content">
+              Create your first factory
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+              A factory is a repeatable workflow aimed at an outcome, like
+              driving CVEs to zero or taking issues to reviewed PRs. It groups
+              the agents, automations and work that get you there.
+            </p>
+            <div className="mt-5 flex justify-center gap-2">
+              <Button variant="primary" onClick={() => setCreating(true)}>
+                <Plus className="size-4" /> Create factory
+              </Button>
+              <Button variant="ghost" onClick={reset}>
+                Restore demo factory
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {factories.length > 0 ? (
+          <SectionTitle
+            right={
+              <Muted>
+                {factories.length}{" "}
+                {factories.length === 1 ? "factory" : "factories"}
+              </Muted>
+            }
+          >
+            Your factories
+          </SectionTitle>
+        ) : null}
         <div className="flex flex-col gap-3">
           {factories.map((f) => (
             <Card
@@ -67,7 +96,8 @@ export default function FactoriesListRoute() {
                     {f.name}
                   </div>
                   <Muted className="mt-0.5 truncate">
-                    {f.description ||
+                    {f.goal ||
+                      f.description ||
                       "Coordinate work across agents, automations and repositories"}
                   </Muted>
                 </div>
@@ -81,7 +111,7 @@ export default function FactoriesListRoute() {
                 <span>·</span>
                 <span>{AGENTS.length} agents</span>
                 <span>·</span>
-                <span>{WORK_ITEMS.length} work items</span>
+                <span>{EXTERNAL_REFS.length} issues & PRs</span>
               </div>
             </Card>
           ))}

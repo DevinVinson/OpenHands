@@ -4,6 +4,7 @@ import {
   ATTENTION_ITEMS,
   BLOCKER_PATTERNS,
   RESOLUTION_RULES,
+  findRef,
   type BlockerPattern,
   type ResolutionRule,
   type RuleCoverage,
@@ -303,7 +304,8 @@ export function OperatorPage({ factory }: FactoryPageProps) {
             <div className="min-w-0">
               <div className="font-medium text-content">{a.title}</div>
               <Muted className="mt-1">
-                {a.kind} · {a.workItemId} · waiting {a.age}
+                {a.kind} · {findRef(a.refId)?.label ?? a.refId} · waiting{" "}
+                {a.age}
               </Muted>
             </div>
             <div className="flex shrink-0 gap-2">

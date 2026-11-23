@@ -121,6 +121,7 @@ export function AgentProfilePage({
         }
       />
       <div className="mb-5 flex flex-wrap items-center gap-2">
+        {agent.orchestrator ? <Badge tone="good">Primary agent</Badge> : null}
         <Badge tone="info">{agent.active} active</Badge>
         <Badge>{agent.scope}</Badge>
         <Badge>{agent.model}</Badge>
@@ -215,6 +216,24 @@ export function AgentProfilePage({
             ) : (
               <Muted>No runs yet</Muted>
             )}
+          </Card>
+          <Card className="mt-4">
+            <div className="mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-content">Runs as</h3>
+              <Badge tone="info">OHE</Badge>
+            </div>
+            <div className="rounded-md border border-border px-3 py-2 font-mono text-sm text-content">
+              {agent.runsAs ?? "Person who started the run"}
+            </div>
+            <Muted className="mt-2">
+              A service account makes commits, comments and PRs attributable to
+              the factory instead of whoever set it up.
+            </Muted>
+            <div className="mt-3">
+              <Button size="sm" onClick={() => demo("Choose service account")}>
+                {agent.runsAs ? "Change account" : "Use a service account"}
+              </Button>
+            </div>
           </Card>
           <Card className="mt-4">
             <CardTitle>Scope changes</CardTitle>

@@ -6,13 +6,12 @@ import { useNavigation } from "#/context/navigation-context";
 import {
   DEFINITION_FILES,
   FACTORY_YAML,
-  RUNS,
   factoryPath,
-  factoryRunPath,
-  factoryWorkItemPath,
+  factoryRefPath,
+  findAgent,
+  findRef,
   findRun,
-  findWorkItem,
-  WORK_STAGES,
+  type Factory,
 } from "../factory-data";
 import {
   Badge,
@@ -22,9 +21,7 @@ import {
   CodeBox,
   Muted,
   PageHeading,
-  Pill,
   Row,
-  SectionTitle,
   Stat,
   Timeline,
   useFactoryDrawer,
@@ -46,129 +43,6 @@ function ArtifactList({ items }: { items: string[] }) {
   );
 }
 
-export function WorkItemPage({
-  factory,
-  itemId,
-}: FactoryPageProps & { itemId?: string }) {
-  const item = findWorkItem(itemId);
-  const { navigate } = useNavigation();
-  const { demo } = useFactoryDrawer();
-  const stageLabel =
-    WORK_STAGES.find((s) => s.stage === item.stage)?.label ?? item.stage;
-  const runs = RUNS.filter((r) => r.workItemId === item.id);
-  const shownRuns = runs.length ? runs : RUNS.slice(1, 3);
-
-  return (
-    <>
-      <PageHeading
-        backTo={factoryPath(factory.id, "queue")}
-        backLabel="Work queue"
-        eyebrow={eyebrow(factory)}
-        title={`${item.id} · ${item.title}`}
-        subtitle="Single work item spanning planning, agent runs, and final review."
-        actions={
-          <Button onClick={() => demo("Originating issue")}>
-            View originating issue
-          </Button>
-        }
-      />
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        <Badge tone="info">{stageLabel}</Badge>
-        {item.stage === "plan" ? (
-          <Badge tone="warn">Needs spec approval</Badge>
-        ) : null}
-        <Muted>{item.source}</Muted>
-        <div className="flex-1" />
-        <Badge>Owned by {item.agent}</Badge>
-      </div>
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="min-w-0 flex-1">
-          <Card>
-            <CardTitle>Work item context</CardTitle>
-            <p className="text-sm leading-relaxed text-content">
-              Clarify the expected behavior, document the change, and propose
-              the implementation plan for approval before any code is written.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <Pill>{item.source.split(" · ")[0]} issue</Pill>
-              <Pill>{item.source.split(" · ")[1]}</Pill>
-              <Pill>security-review</Pill>
-            </div>
-          </Card>
-          <SectionTitle>Workflow activity</SectionTitle>
-          <Card>
-            <Timeline
-              events={[
-                {
-                  title: `Received from ${item.source.split(" · ")[0]}`,
-                  detail: "Automated issue intake saved all original context",
-                  done: true,
-                },
-                {
-                  title: "Triage complete",
-                  detail: "Classified as medium risk, requires a written spec",
-                  done: true,
-                },
-                {
-                  title: "Planning in progress",
-                  detail: "Planner created proposal and open questions",
-                  done: true,
-                },
-                {
-                  title: "Approval needed",
-                  detail: "Reviewer to accept spec before implementation",
-                },
-              ]}
-            />
-          </Card>
-        </div>
-        <div className="w-full shrink-0 lg:w-72">
-          <Card>
-            <CardTitle>Next action</CardTitle>
-            <Badge tone="warn">Waiting for approval</Badge>
-            <p className="my-3 text-sm text-content">
-              Review the implementation plan before the build agent begins
-              writing code.
-            </p>
-            <Button
-              variant="primary"
-              onClick={() => demo("Review specification")}
-            >
-              Review specification
-            </Button>
-            <div className="my-4 h-px bg-border" />
-            <div className="text-2xs font-semibold uppercase tracking-wider text-muted">
-              Artifacts
-            </div>
-            <ArtifactList
-              items={[
-                "Implementation plan",
-                "Risk analysis",
-                "Source issue",
-                "Agent session",
-              ]}
-            />
-          </Card>
-          <Card className="mt-4">
-            <CardTitle>Agent runs</CardTitle>
-            {shownRuns.map((r) => (
-              <Row
-                key={r.id}
-                onClick={() => navigate(factoryRunPath(factory.id, r.id))}
-              >
-                <span className="text-content">
-                  {r.id} · {r.agent}
-                </span>
-                <Badge tone={runTone(r.status)}>{r.status}</Badge>
-              </Row>
-            ))}
-          </Card>
-        </div>
-      </div>
-    </>
-  );
-}
-
 export function RunDetailPage({
   factory,
   runId,
@@ -185,20 +59,25 @@ export function RunDetailPage({
         title={`${run.id} · ${run.task}`}
         subtitle={
           <>
-            Work item{" "}
+            {findRef(run.refId)?.type === "pr" ? "PR" : "Issue"}{" "}
             <button
               type="button"
               className="cursor-pointer text-link underline"
-              onClick={() =>
-                navigate(factoryWorkItemPath(factory.id, run.workItemId))
-              }
+              onClick={() => navigate(factoryRefPath(factory.id, run.refId))}
             >
-              {run.workItemId}
+              {findRef(run.refId)?.label ?? run.refId}
             </button>{" "}
             / {run.agent} / started {run.duration} ago
           </>
         }
-        actions={<Button onClick={() => demo("Stop run")}>Stop run</Button>}
+        actions={
+          <>
+            <Button onClick={() => demo("Open trace in Laminar")}>
+              Open in Laminar <ArrowUpRight className="size-3.5" />
+            </Button>
+            <Button onClick={() => demo("Stop run")}>Stop run</Button>
+          </>
+        }
       />
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Stat small label="Status" value={run.status} />
@@ -291,7 +170,32 @@ Preparing change summary and PR artifacts…`}</CodeBox>
 
 type SettingsTab = "overview" | "definitions" | "integrations" | "permissions";
 
-export function SettingsPage({ factory }: FactoryPageProps) {
+function factoryYaml(f: Factory) {
+  const kpis = f.kpis.length
+    ? f.kpis
+        .map((k) => `  - name: ${k.label}\n    target: "${k.target}"`)
+        .join("\n")
+    : "  []";
+  return `schemaVersion: v1alpha1
+name: ${f.id}
+description: ${f.description || '""'}
+goal: >
+  ${f.goal || "TBD"}
+kpis:
+${kpis}
+owner: ${f.owner || "unassigned"}
+tag: ${f.tag}
+orchestrator: ${f.orchestratorId ?? "null"}
+repositories:
+${f.repositories.map((r) => `  - ${r}`).join("\n")}
+integrations: [${f.integrations.join(", ")}]
+${FACTORY_YAML.slice(FACTORY_YAML.indexOf("blueprint:"))}`;
+}
+
+export function SettingsPage({
+  factory,
+  onDelete,
+}: FactoryPageProps & { onDelete?: () => void }) {
   const { demo } = useFactoryDrawer();
   const [tab, setTab] = React.useState<SettingsTab>("overview");
   const [file, setFile] = React.useState(DEFINITION_FILES[0]);
@@ -337,14 +241,24 @@ export function SettingsPage({ factory }: FactoryPageProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardTitle>Factory identity</CardTitle>
-            <Muted>Name</Muted>
-            <p className="mb-3 mt-0.5 text-sm text-content">{factory.name}</p>
-            <Muted>Orchestrator</Muted>
-            <p className="mb-3 mt-0.5 text-sm text-content">@{factory.id}</p>
-            <Muted>Description</Muted>
-            <p className="mt-0.5 text-sm text-content">
-              {factory.description || "—"}
-            </p>
+            {(
+              [
+                ["Name", factory.name],
+                ["Description", factory.description || "—"],
+                ["Goal", factory.goal || "—"],
+                ["Owner / team", factory.owner || "—"],
+                ["Tag", factory.tag],
+                [
+                  "Primary agent",
+                  findAgent(factory.orchestratorId)?.name ?? "None (optional)",
+                ],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="mb-3">
+                <Muted>{k}</Muted>
+                <p className="mt-0.5 text-sm text-content">{v}</p>
+              </div>
+            ))}
           </Card>
           <Card>
             <CardTitle>Repository scope</CardTitle>
@@ -360,45 +274,105 @@ export function SettingsPage({ factory }: FactoryPageProps) {
               </Button>
             </div>
           </Card>
+          <Card className="md:col-span-2">
+            <CardTitle>Danger zone</CardTitle>
+            <div className="flex flex-wrap items-center gap-3">
+              <Muted className="flex-1">
+                Deleting removes the factory from Canvas. Its definition stays
+                in {factory.definitionsRepo}.
+              </Muted>
+              <Button onClick={onDelete}>Delete factory</Button>
+            </div>
+          </Card>
         </div>
       ) : null}
       {tab === "definitions" ? (
-        <div className="flex flex-col gap-4 lg:flex-row">
-          <div className="w-full shrink-0 lg:w-72">
-            <Card>
-              <CardTitle>Definition files</CardTitle>
-              {DEFINITION_FILES.map((f) => (
-                <Row key={f} onClick={() => setFile(f)}>
-                  <span
-                    className={cn(
-                      "font-mono text-xs",
-                      f === file ? "text-content" : "text-muted",
-                    )}
-                  >
-                    {f}
-                  </span>
-                  <span className="text-muted">›</span>
-                </Row>
-              ))}
-            </Card>
-          </div>
-          <div className="min-w-0 flex-1">
-            <Card>
-              <div className="mb-3 flex items-center">
-                <h3 className="font-mono text-sm font-semibold text-content">
-                  {file}
-                </h3>
-                <div className="flex-1" />
-                <Badge tone="good">v1.4 published</Badge>
+        <>
+          <Card className="mb-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <Muted>Definition repository</Muted>
+                <div className="mt-0.5 font-mono text-sm text-content">
+                  {factory.definitionsRepo}/{factory.definitionsPath}
+                </div>
               </div>
-              <CodeBox>
-                {file === "factory.yaml"
-                  ? FACTORY_YAML
-                  : `# ${file}\n# Version-controlled definition (prototype placeholder)`}
-              </CodeBox>
-            </Card>
+              <div className="flex-1" />
+              <Badge tone="good">In sync · main @ 3f9c2a1</Badge>
+              <Button
+                size="sm"
+                onClick={() => demo("Open pull request with changes")}
+              >
+                Changes open as a PR
+              </Button>
+            </div>
+            <div className="mt-3 border-t border-border pt-3">
+              {[
+                [
+                  "3f9c2a1",
+                  "Add stale-review rule",
+                  "Factory Coordinator",
+                  "2h",
+                ],
+                [
+                  "a71e0d4",
+                  "Tighten QA evidence requirement",
+                  "Priya S.",
+                  "1d",
+                ],
+                [
+                  "09bd5c3",
+                  "Initial factory from creation flow",
+                  "Canvas",
+                  "6d",
+                ],
+              ].map(([sha, msg, who, when]) => (
+                <div key={sha} className="flex gap-3 py-1 text-xs">
+                  <span className="font-mono text-muted">{sha}</span>
+                  <span className="flex-1 text-content">{msg}</span>
+                  <span className="text-muted">
+                    {who} · {when}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="w-full shrink-0 lg:w-72">
+              <Card>
+                <CardTitle>Definition files</CardTitle>
+                {DEFINITION_FILES.map((f) => (
+                  <Row key={f} onClick={() => setFile(f)}>
+                    <span
+                      className={cn(
+                        "font-mono text-xs",
+                        f === file ? "text-content" : "text-muted",
+                      )}
+                    >
+                      {f}
+                    </span>
+                    <span className="text-muted">›</span>
+                  </Row>
+                ))}
+              </Card>
+            </div>
+            <div className="min-w-0 flex-1">
+              <Card>
+                <div className="mb-3 flex items-center">
+                  <h3 className="font-mono text-sm font-semibold text-content">
+                    {file}
+                  </h3>
+                  <div className="flex-1" />
+                  <Badge tone="good">v1.4 published</Badge>
+                </div>
+                <CodeBox>
+                  {file === "factory.yaml"
+                    ? factoryYaml(factory)
+                    : `# ${file}\n# Version-controlled definition (prototype placeholder)`}
+                </CodeBox>
+              </Card>
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
       {tab === "integrations" ? (
         <div className="grid gap-4 md:grid-cols-3">

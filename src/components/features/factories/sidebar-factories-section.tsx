@@ -31,7 +31,6 @@ function activeSectionFor(
   }
   const [first] = currentPath.slice(prefix.length).split("/").filter(Boolean);
   if (!first) return DEFAULT_FACTORY_SECTION;
-  if (first === "work") return "queue";
   return isFactorySection(first) ? first : DEFAULT_FACTORY_SECTION;
 }
 
@@ -67,6 +66,14 @@ export function SidebarFactoriesSection({ collapsed }: { collapsed: boolean }) {
           <Plus className="size-3.5" />
         </button>
       </div>
+      {factories.length === 0 ? (
+        <NavigationLink
+          to={FACTORIES_PATH}
+          className="rounded-md px-2.5 py-2 text-xs text-muted hover:bg-surface-raised hover:text-content"
+        >
+          No factories yet — create one
+        </NavigationLink>
+      ) : null}
       {factories.map((f) => {
         const open = expandedId === f.id;
         const active = activeSectionFor(currentPath, f.id);

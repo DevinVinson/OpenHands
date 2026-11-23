@@ -4,13 +4,17 @@
  * PROTOTYPE: nothing here is fetched from a backend. These records exist so
  * the Factories UI can be clicked through and discussed; the real contracts
  * belong in the Agent Server / TypeScript client.
+ *
+ * Core M1 unit: a factory work log (event stream) whose entries reference
+ * thin issue / PR records. There is no separate "work item" object.
  */
 
 export const FACTORIES_PATH = "/factories";
 
 export type FactorySection =
   | "overview"
-  | "queue"
+  | "stream"
+  | "conversations"
   | "operator"
   | "blueprint"
   | "automations"
@@ -29,8 +33,9 @@ export function factoryPath(factoryId: string, section?: FactorySection) {
     : base;
 }
 
-export function factoryWorkItemPath(factoryId: string, itemId: string) {
-  return `${factoryPath(factoryId)}/work/${encodeURIComponent(itemId)}`;
+/** Detail for one issue / PR reference, drilled into from the Work stream. */
+export function factoryRefPath(factoryId: string, refId: string) {
+  return `${factoryPath(factoryId, "stream")}/${encodeURIComponent(refId)}`;
 }
 
 export function factoryRunPath(factoryId: string, runId: string) {
@@ -53,7 +58,8 @@ export const FACTORY_NAV_GROUPS: FactoryNavGroup[] = [
   {
     items: [
       { section: "overview", label: "Overview" },
-      { section: "queue", label: "Work queue", count: 9 },
+      { section: "stream", label: "Work stream" },
+      { section: "conversations", label: "Conversations", count: 4 },
       { section: "operator", label: "Operator view", count: 5 },
     ],
   },
@@ -62,7 +68,7 @@ export const FACTORY_NAV_GROUPS: FactoryNavGroup[] = [
     items: [
       { section: "blueprint", label: "Workflow blueprint" },
       { section: "automations", label: "Automations", count: 6 },
-      { section: "agents", label: "Agents", count: 5 },
+      { section: "agents", label: "Agents", count: 6 },
     ],
   },
   {
@@ -86,11 +92,28 @@ export function isFactorySection(value: unknown): value is FactorySection {
   return FACTORY_SECTIONS.includes(value as FactorySection);
 }
 
+export interface Kpi {
+  label: string;
+  value: string;
+  target: string;
+  onTrack: boolean;
+}
+
 export interface Factory {
   id: string;
   name: string;
   description: string;
+  goal: string;
+  kpis: Kpi[];
+  owner: string;
+  tag: string;
   repositories: string[];
+  /** Where the factory's version-controlled definition lives. */
+  definitionsRepo: string;
+  definitionsPath: string;
+  integrations: string[];
+  /** Optional primary agent / orchestrator (an agent id). */
+  orchestratorId?: string;
 }
 
 export const SEED_FACTORIES: Factory[] = [
@@ -98,126 +121,376 @@ export const SEED_FACTORIES: Factory[] = [
     id: "demo-factory",
     name: "DemoFactory",
     description: "Build, verify and review product changes.",
+    goal: "Take incoming user issues from triage to a reviewed pull request without a person repairing the pipeline.",
+    kpis: [
+      {
+        label: "Issues → merged PR",
+        value: "27",
+        target: "30 / month",
+        onTrack: false,
+      },
+      {
+        label: "Median time to PR",
+        value: "6.4h",
+        target: "< 8h",
+        onTrack: true,
+      },
+      {
+        label: "Cost per merged PR",
+        value: "$18.42",
+        target: "< $25",
+        onTrack: true,
+      },
+    ],
+    owner: "Platform team",
+    tag: "factory:demo",
     repositories: ["org/web-app", "org/api-service"],
+    definitionsRepo: "org/factories",
+    definitionsPath: "demo-factory/",
+    integrations: ["GitHub", "Linear", "Jira", "Sentry", "Slack"],
+    orchestratorId: "coordinator",
   },
 ];
 
-export type WorkStage = "triage" | "plan" | "build" | "verify" | "review";
-export type Priority = "High" | "Medium" | "Low";
-
-export const WORK_STAGES: { stage: WorkStage; label: string }[] = [
-  { stage: "triage", label: "Inbox & triage" },
-  { stage: "plan", label: "Planning" },
-  { stage: "build", label: "Building" },
-  { stage: "verify", label: "Verification" },
-  { stage: "review", label: "Review & ship" },
+export const INTEGRATION_OPTIONS = [
+  "GitHub",
+  "GitLab",
+  "Jira",
+  "Linear",
+  "Sentry",
+  "Slack",
 ];
 
-export interface WorkItem {
+export const DEFINITION_REPO_OPTIONS = [
+  "org/factories",
+  "org/platform-config",
+  "org/web-app",
+  "org/api-service",
+];
+
+/* ------------------------------------------------------------------ */
+/* Issues & PRs: thin external references                              */
+/* ------------------------------------------------------------------ */
+
+export type RefType = "issue" | "pr";
+export type RefRelation = "Created" | "Worked on";
+
+export interface ExternalRef {
+  id: string;
+  type: RefType;
+  provider: "GitHub" | "Linear" | "Jira" | "Sentry";
+  /** How the provider labels it, e.g. `api-service#482`. */
+  label: string;
+  title: string;
+  state: string;
+  relation: RefRelation;
+  /** Snapshot age. */
+  updated: string;
+  /** Artifacts the factory produced against this reference. */
+  produced?: string[];
+}
+
+export const EXTERNAL_REFS: ExternalRef[] = [
+  {
+    id: "api-482",
+    type: "issue",
+    provider: "GitHub",
+    label: "api-service#482",
+    title: "Duplicate webhook deliveries",
+    state: "Open",
+    relation: "Worked on",
+    updated: "1m",
+    produced: ["Triage summary"],
+  },
+  {
+    id: "web-3f1",
+    type: "issue",
+    provider: "Sentry",
+    label: "WEB-3F1",
+    title: "Sporadic auth timeouts",
+    state: "Open",
+    relation: "Worked on",
+    updated: "8m",
+    produced: ["Reproduction notes"],
+  },
+  {
+    id: "plat-317",
+    type: "issue",
+    provider: "Jira",
+    label: "PLAT-317",
+    title: "Document organization permissions",
+    state: "In progress",
+    relation: "Worked on",
+    updated: "24m",
+    produced: ["Product spec", "Risk analysis"],
+  },
+  {
+    id: "eng-212",
+    type: "issue",
+    provider: "Linear",
+    label: "ENG-212",
+    title: "Improve retry behavior for failed jobs",
+    state: "Open",
+    relation: "Created",
+    updated: "1h",
+  },
+  {
+    id: "web-811",
+    type: "pr",
+    provider: "GitHub",
+    label: "web-app#811",
+    title: "Accessible labels in editor",
+    state: "In review",
+    relation: "Created",
+    updated: "2h",
+    produced: ["Test report", "Screenshot evidence"],
+  },
+  {
+    id: "api-819",
+    type: "pr",
+    provider: "GitHub",
+    label: "api-service#819",
+    title: "Update webhook payload schema",
+    state: "Draft",
+    relation: "Created",
+    updated: "3h",
+  },
+  {
+    id: "api-477",
+    type: "issue",
+    provider: "GitHub",
+    label: "api-service#477",
+    title: "Flaky retry test fails CI on main",
+    state: "Open",
+    relation: "Worked on",
+    updated: "5h",
+    produced: ["QA run"],
+  },
+  {
+    id: "api-806",
+    type: "pr",
+    provider: "GitHub",
+    label: "api-service#806",
+    title: "Token renewal change",
+    state: "Merged",
+    relation: "Created",
+    updated: "1d",
+    produced: ["Review notes"],
+  },
+];
+
+export function findRef(id: string | undefined) {
+  return EXTERNAL_REFS.find((r) => r.id === id);
+}
+
+/* ------------------------------------------------------------------ */
+/* Work log / event stream                                             */
+/* ------------------------------------------------------------------ */
+
+export type LogSource = "agent" | "automation" | "human" | "system";
+export type LogEntryType =
+  "event" | "status" | "handoff" | "blocker" | "decision" | "note";
+
+export interface WorkLogEntry {
+  id: string;
+  /** Minutes ago, for filtering by period. */
+  minutesAgo: number;
+  when: string;
+  source: LogSource;
+  sourceName: string;
+  type: LogEntryType;
+  summary: string;
+  refId?: string;
+  runId?: string;
+  conversation?: string;
+}
+
+export const WORK_LOG: WorkLogEntry[] = [
+  {
+    id: "l1",
+    minutesAgo: 1,
+    when: "1m",
+    source: "automation",
+    sourceName: "Issue opened",
+    type: "event",
+    summary: "New issue received and handed to Triage Agent",
+    refId: "api-482",
+  },
+  {
+    id: "l2",
+    minutesAgo: 3,
+    when: "3m",
+    source: "agent",
+    sourceName: "Triage Agent",
+    type: "status",
+    summary: "Classified as bug · high priority · api-service",
+    refId: "api-482",
+    runId: "RUN-412",
+  },
+  {
+    id: "l3",
+    minutesAgo: 8,
+    when: "8m",
+    source: "automation",
+    sourceName: "Incident alert",
+    type: "event",
+    summary: "Sentry alert linked to an existing issue",
+    refId: "web-3f1",
+  },
+  {
+    id: "l4",
+    minutesAgo: 14,
+    when: "14m",
+    source: "agent",
+    sourceName: "Planner",
+    type: "blocker",
+    summary:
+      "Requirements ambiguous: asked the issue author about retry behavior",
+    refId: "web-3f1",
+    runId: "RUN-407",
+  },
+  {
+    id: "l5",
+    minutesAgo: 18,
+    when: "18m",
+    source: "agent",
+    sourceName: "Planner",
+    type: "handoff",
+    summary: "Spec drafted; waiting at the approval gate",
+    refId: "plat-317",
+    runId: "RUN-410",
+  },
+  {
+    id: "l6",
+    minutesAgo: 41,
+    when: "41m",
+    source: "system",
+    sourceName: "Rule · Retry flaky CI",
+    type: "decision",
+    summary: "CI failure matched a flaky test; re-run 1 of 2 started",
+    refId: "api-477",
+    runId: "RUN-408",
+  },
+  {
+    id: "l7",
+    minutesAgo: 62,
+    when: "1h",
+    source: "agent",
+    sourceName: "Factory Coordinator",
+    type: "event",
+    summary: "Opened follow-up issue for retry behavior found during triage",
+    refId: "eng-212",
+  },
+  {
+    id: "l8",
+    minutesAgo: 120,
+    when: "2h",
+    source: "agent",
+    sourceName: "Implementation Agent",
+    type: "status",
+    summary: "Opened PR with 42 passing component tests",
+    refId: "web-811",
+    runId: "RUN-411",
+  },
+  {
+    id: "l9",
+    minutesAgo: 130,
+    when: "2h",
+    source: "agent",
+    sourceName: "Review Agent",
+    type: "handoff",
+    summary: "No blocking findings; requested human review",
+    refId: "web-811",
+    runId: "RUN-409",
+  },
+  {
+    id: "l10",
+    minutesAgo: 180,
+    when: "3h",
+    source: "agent",
+    sourceName: "Implementation Agent",
+    type: "status",
+    summary: "Draft PR opened for payload schema change",
+    refId: "api-819",
+    runId: "RUN-406",
+  },
+  {
+    id: "l11",
+    minutesAgo: 300,
+    when: "5h",
+    source: "human",
+    sourceName: "Devon M.",
+    type: "decision",
+    summary: "Marked merge authorization as always-human for api-service",
+  },
+  {
+    id: "l12",
+    minutesAgo: 1440,
+    when: "1d",
+    source: "human",
+    sourceName: "Priya S.",
+    type: "decision",
+    summary: "Approved and merged token renewal change",
+    refId: "api-806",
+  },
+  {
+    id: "l13",
+    minutesAgo: 1500,
+    when: "1d",
+    source: "agent",
+    sourceName: "Factory Coordinator",
+    type: "note",
+    summary:
+      "Daily summary: 6 PRs opened, 3 merged, 2 blockers resolved by rules",
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/* Conversations attached to the factory                               */
+/* ------------------------------------------------------------------ */
+
+export interface FactoryConversation {
   id: string;
   title: string;
-  source: string;
-  stage: WorkStage;
-  priority: Priority;
-  age: string;
   agent: string;
+  status: "Running" | "Waiting" | "Idle";
+  refId?: string;
+  updated: string;
 }
 
-export const WORK_ITEMS: WorkItem[] = [
-  [
-    "SF-1042",
-    "Fix duplicate webhook deliveries",
-    "GitHub · api-service",
-    "triage",
-    "High",
-    "1m",
-  ],
-  [
-    "SF-1048",
-    "Investigate sporadic auth timeouts",
-    "Sentry · web-app",
-    "triage",
-    "Medium",
-    "8m",
-  ],
-  [
-    "SF-1036",
-    "Document organization permissions",
-    "Jira · platform",
-    "plan",
-    "Medium",
-    "24m",
-  ],
-  [
-    "SF-1031",
-    "Improve retry behavior for failed jobs",
-    "Linear · api-service",
-    "plan",
-    "Low",
-    "1h",
-  ],
-  [
-    "SF-1023",
-    "Implement accessible labels in editor",
-    "GitHub · web-app",
-    "build",
-    "Medium",
-    "2h",
-  ],
-  [
-    "SF-1018",
-    "Update webhook payload schema",
-    "Linear · api-service",
-    "build",
-    "High",
-    "3h",
-  ],
-  [
-    "SF-1027",
-    "Regression verification for CI failures",
-    "GitHub · api-service",
-    "verify",
-    "Medium",
-    "5h",
-  ],
-  [
-    "SF-1009",
-    "Review PR #811 test coverage",
-    "GitHub · web-app",
-    "review",
-    "High",
-    "8h",
-  ],
-  [
-    "SF-1013",
-    "Approve change to token renewal",
-    "Linear · api-service",
-    "review",
-    "High",
-    "1d",
-  ],
-].map(([id, title, source, stage, priority, age]) => ({
-  id,
-  title,
-  source,
-  stage: stage as WorkStage,
-  priority: priority as Priority,
-  age,
-  agent:
-    stage === "build"
-      ? "Implementation Agent"
-      : stage === "review"
-        ? "Review Agent"
-        : stage === "verify"
-          ? "QA Agent"
-          : stage === "triage"
-            ? "Triage Agent"
-            : "Planner",
-}));
-
-export function findWorkItem(id: string | undefined) {
-  return WORK_ITEMS.find((w) => w.id === id) ?? WORK_ITEMS[2];
-}
+export const FACTORY_CONVERSATIONS: FactoryConversation[] = [
+  {
+    id: "c1",
+    title: "Triage api-service#482",
+    agent: "Triage Agent",
+    status: "Running",
+    refId: "api-482",
+    updated: "now",
+  },
+  {
+    id: "c2",
+    title: "Implement accessible labels",
+    agent: "Implementation Agent",
+    status: "Running",
+    refId: "web-811",
+    updated: "6m",
+  },
+  {
+    id: "c3",
+    title: "Plan PLAT-317 permissions spec",
+    agent: "Planner",
+    status: "Waiting",
+    refId: "plat-317",
+    updated: "18m",
+  },
+  {
+    id: "c4",
+    title: "Coordinate today's queue",
+    agent: "Factory Coordinator",
+    status: "Idle",
+    updated: "1h",
+  },
+];
 
 export type AttentionKind = "Spec approval" | "Question" | "PR review";
 
@@ -225,7 +498,7 @@ export interface AttentionItem {
   id: string;
   title: string;
   kind: AttentionKind;
-  workItemId: string;
+  refId: string;
   age: string;
   action: string;
   detail: string;
@@ -236,7 +509,7 @@ export const ATTENTION_ITEMS: AttentionItem[] = [
     id: "att-1",
     title: "Review proposed retry policy",
     kind: "Spec approval",
-    workItemId: "SF-1036",
+    refId: "plat-317",
     age: "18m",
     action: "Review spec",
     detail:
@@ -246,7 +519,7 @@ export const ATTENTION_ITEMS: AttentionItem[] = [
     id: "att-2",
     title: "Define expected auth retry behavior",
     kind: "Question",
-    workItemId: "SF-1048",
+    refId: "web-3f1",
     age: "39m",
     action: "Answer",
     detail:
@@ -256,7 +529,7 @@ export const ATTENTION_ITEMS: AttentionItem[] = [
     id: "att-3",
     title: "Approve PR #811 accessibility fixes",
     kind: "PR review",
-    workItemId: "SF-1009",
+    refId: "web-811",
     age: "2h",
     action: "Review PR",
     detail:
@@ -293,7 +566,7 @@ export const BLOCKER_PATTERNS: BlockerPattern[] = [
     autoResolved: 12,
     coverage: "Covered",
     ruleId: "retry-flaky",
-    example: "SF-1027 · Regression verification for CI failures",
+    example: "api-service#477 · Flaky retry test fails CI on main",
     suggestion: "Rule is working. 2 of 14 escalated after retries ran out.",
   },
   {
@@ -304,7 +577,7 @@ export const BLOCKER_PATTERNS: BlockerPattern[] = [
     last7d: 9,
     autoResolved: 0,
     coverage: "No rule",
-    example: "SF-1036 · Document organization permissions",
+    example: "PLAT-317 · Document organization permissions",
     suggestion:
       "8 of the last 9 low-risk documentation specs were approved unchanged. Auto-approve low-risk docs specs and notify the owner.",
   },
@@ -317,7 +590,7 @@ export const BLOCKER_PATTERNS: BlockerPattern[] = [
     autoResolved: 4,
     coverage: "Partial",
     ruleId: "ask-author",
-    example: "SF-1048 · Investigate sporadic auth timeouts",
+    example: "WEB-3F1 · Sporadic auth timeouts",
     suggestion:
       "Planner asks the issue author, but nothing happens if they don't reply. Add an escalation after 4h.",
   },
@@ -329,7 +602,7 @@ export const BLOCKER_PATTERNS: BlockerPattern[] = [
     last7d: 3,
     autoResolved: 0,
     coverage: "No rule",
-    example: "SF-1018 · Update webhook payload schema",
+    example: "api-service#819 · Update webhook payload schema",
     suggestion:
       "Request access from the repository owner automatically and park the item until it's granted.",
   },
@@ -408,6 +681,10 @@ export interface Agent {
   model: string;
   scope: string;
   active: number;
+  /** The factory's primary agent / orchestrator. */
+  orchestrator?: boolean;
+  /** OHE: service account the agent acts as, instead of the person who set it up. */
+  runsAs?: string;
   /** Agent profile backing this agent: it sets the agent's scope. */
   profile: {
     name: string;
@@ -417,6 +694,22 @@ export interface Agent {
 }
 
 export const AGENTS: Agent[] = [
+  {
+    id: "coordinator",
+    name: "Factory Coordinator",
+    description: "Watches the work stream, notices stuck work and routes it",
+    model: "reasoning-model",
+    scope: "Read-only + issues",
+    active: 1,
+    orchestrator: true,
+    runsAs: "demofactory[bot]",
+    profile: {
+      name: "factory-coordinator",
+      tools: ["terminal", "task_tracker"],
+      instructions:
+        "Own the factory's goal. Watch the work log, detect stalled work, apply resolution rules, and escalate only what no rule covers. Post a daily summary.",
+    },
+  },
   {
     id: "triage",
     name: "Triage Agent",
@@ -550,13 +843,38 @@ export const AUTOMATIONS: AutomationRecord[] = [
   },
 ];
 
+export interface RecommendedAutomation {
+  name: string;
+  why: string;
+  agent: string;
+}
+
+/** From the template library, for this kind of factory. */
+export const RECOMMENDED_AUTOMATIONS: RecommendedAutomation[] = [
+  {
+    name: "Stale PR nudge",
+    why: "PRs wait 26h on average in review",
+    agent: "Factory Coordinator",
+  },
+  {
+    name: "Slack health report",
+    why: "Daily summary of the work stream to #factory-ops",
+    agent: "Factory Coordinator",
+  },
+  {
+    name: "Dependency CVE monitor",
+    why: "2 repositories have no security scanning",
+    agent: "Triage Agent",
+  },
+];
+
 export type RunStatus =
   "Working" | "Waiting" | "Complete" | "Blocked" | "Failed";
 
 export interface RunRecord {
   id: string;
   task: string;
-  workItemId: string;
+  refId: string;
   agent: string;
   status: RunStatus;
   duration: string;
@@ -567,7 +885,7 @@ export const RUNS: RunRecord[] = [
   {
     id: "RUN-411",
     task: "Implement accessible labels",
-    workItemId: "SF-1023",
+    refId: "web-811",
     agent: "Implementation Agent",
     status: "Working",
     duration: "6m",
@@ -576,7 +894,7 @@ export const RUNS: RunRecord[] = [
   {
     id: "RUN-410",
     task: "Plan retry policy",
-    workItemId: "SF-1036",
+    refId: "plat-317",
     agent: "Planner",
     status: "Waiting",
     duration: "14m",
@@ -585,7 +903,7 @@ export const RUNS: RunRecord[] = [
   {
     id: "RUN-409",
     task: "Review token renewal PR",
-    workItemId: "SF-1013",
+    refId: "api-806",
     agent: "Review Agent",
     status: "Complete",
     duration: "8m",
@@ -594,7 +912,7 @@ export const RUNS: RunRecord[] = [
   {
     id: "RUN-408",
     task: "Failed CI workflow",
-    workItemId: "SF-1027",
+    refId: "api-477",
     agent: "Implementation Agent",
     status: "Blocked",
     duration: "24m",
@@ -603,7 +921,7 @@ export const RUNS: RunRecord[] = [
   {
     id: "RUN-407",
     task: "Investigate auth regression",
-    workItemId: "SF-1048",
+    refId: "web-3f1",
     agent: "Triage Agent",
     status: "Complete",
     duration: "3m",
@@ -612,7 +930,7 @@ export const RUNS: RunRecord[] = [
   {
     id: "RUN-406",
     task: "Test API pagination change",
-    workItemId: "SF-1018",
+    refId: "api-819",
     agent: "QA Agent",
     status: "Complete",
     duration: "10m",
@@ -669,6 +987,7 @@ blueprint:
     - review
 
 agents:
+  - coordinator
   - triage
   - planner
   - implementation

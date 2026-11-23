@@ -4,6 +4,7 @@ import { cn } from "#/utils/utils";
 import { useNavigation } from "#/context/navigation-context";
 import {
   AUTOMATIONS,
+  RECOMMENDED_AUTOMATIONS,
   BLUEPRINT_STAGES,
   AGENTS,
   factoryAgentPath,
@@ -223,6 +224,27 @@ export function AutomationsPage({ factory }: FactoryPageProps) {
           { header: "Last 30d", render: (r) => `${r.runs} runs` },
         ]}
       />
+      <SectionTitle right={<Muted>From the template library</Muted>}>
+        Recommended for this factory
+      </SectionTitle>
+      <div className="grid gap-4 md:grid-cols-3">
+        {RECOMMENDED_AUTOMATIONS.map((r) => (
+          <Card key={r.name}>
+            <div className="text-sm font-semibold text-content">{r.name}</div>
+            <Muted className="mt-1 min-h-8">{r.why}</Muted>
+            <div className="mt-3 flex items-center gap-2">
+              <Muted className="flex-1">Runs as {r.agent}</Muted>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => demo(`Add “${r.name}” and customize`)}
+              >
+                Add
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
       <SectionTitle
         right={
           <Button size="sm" onClick={() => demo("Add webhook")}>
@@ -282,6 +304,7 @@ export function AgentsPage({ factory }: FactoryPageProps) {
                   .slice(0, 2)}
               </div>
               <div className="flex-1" />
+              {w.orchestrator ? <Badge tone="good">Primary agent</Badge> : null}
               <Badge tone="info">{w.active} active</Badge>
             </div>
             <div className="mt-3 text-sm font-semibold text-content">

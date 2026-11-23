@@ -1,17 +1,22 @@
 /* eslint-disable i18next/no-literal-string -- PROTOTYPE: wireframe copy, not yet localized. */
 import React from "react";
-import { ChevronRight } from "lucide-react";
 import { useNavigation } from "#/context/navigation-context";
 import {
+  AGENTS,
+  AUTOMATIONS,
   BLOCKER_PATTERNS,
+  EXTERNAL_REFS,
+  FACTORY_CONVERSATIONS,
   THROUGHPUT,
-  WORK_ITEMS,
-  WORK_STAGES,
+  WORK_LOG,
+  factoryAgentPath,
   factoryPath,
-  factoryWorkItemPath,
+  factoryRefPath,
+  findAgent,
+  findRef,
   type AttentionItem,
   type Factory,
-  type WorkItem,
+  type FactorySection,
 } from "../factory-data";
 import {
   Badge,
@@ -19,62 +24,19 @@ import {
   Button,
   Card,
   CardTitle,
-  FilterChips,
   Muted,
   PageHeading,
   Row,
   SectionTitle,
-  Stat,
   useFactoryDrawer,
 } from "../factory-ui";
+import { LogEntryRow } from "./stream-pages";
 
 export interface FactoryPageProps {
   factory: Factory;
 }
 
 export const eyebrow = (f: Factory) => `${f.name} / Factory`;
-
-function useOpenWorkItem(factory: Factory) {
-  const { open, close } = useFactoryDrawer();
-  const { navigate } = useNavigation();
-  return (item: WorkItem) =>
-    open(
-      item.title,
-      <>
-        <Muted>
-          {item.id} · {item.source}
-        </Muted>
-        <div className="mt-3 flex gap-1.5">
-          <Badge tone={item.priority === "High" ? "warn" : "neutral"}>
-            {item.priority}
-          </Badge>
-          <Badge tone="info">{item.stage}</Badge>
-        </div>
-        <div className="my-4 h-px bg-border" />
-        <div className="text-2xs font-semibold uppercase tracking-wider text-muted">
-          Next action
-        </div>
-        <p className="mt-1 text-sm text-content">
-          Continue this work through its current stage and verify the required
-          evidence before handoff.
-        </p>
-        <div className="mt-4 text-2xs font-semibold uppercase tracking-wider text-muted">
-          Assigned agent
-        </div>
-        <p className="mt-1 text-sm text-content">{item.agent}</p>
-        <div className="my-4 h-px bg-border" />
-        <Button
-          variant="primary"
-          onClick={() => {
-            close();
-            navigate(factoryWorkItemPath(factory.id, item.id));
-          }}
-        >
-          Open work item
-        </Button>
-      </>,
-    );
-}
 
 export function useOpenAttention(factory: Factory) {
   const { open, demo, close } = useFactoryDrawer();
@@ -85,12 +47,12 @@ export function useOpenAttention(factory: Factory) {
       <>
         <div className="flex gap-1.5">
           <Badge tone="warn">{a.kind}</Badge>
-          <Badge>{a.workItemId}</Badge>
+          <Badge>{findRef(a.refId)?.label ?? a.refId}</Badge>
         </div>
         <p className="mt-4 text-sm leading-relaxed text-content">{a.detail}</p>
         <p className="mt-3 text-sm text-muted">
           This work is paused for human input. Review the context, submit a
-          decision and return to the work item.
+          decision, and the factory picks the work back up.
         </p>
         {a.kind === "Question" ? (
           <textarea
@@ -103,10 +65,10 @@ export function useOpenAttention(factory: Factory) {
           <Button
             onClick={() => {
               close();
-              navigate(factoryWorkItemPath(factory.id, a.workItemId));
+              navigate(factoryRefPath(factory.id, a.refId));
             }}
           >
-            Open work item
+            Open {findRef(a.refId)?.type === "pr" ? "PR" : "issue"}
           </Button>
           <div className="flex-1" />
           <Button onClick={() => demo("Request changes")}>
@@ -123,68 +85,132 @@ export function useOpenAttention(factory: Factory) {
 export function OverviewPage({ factory }: FactoryPageProps) {
   const { navigate } = useNavigation();
   const { demo } = useFactoryDrawer();
+  const orchestrator = findAgent(factory.orchestratorId);
+  const go = (section: FactorySection) =>
+    navigate(factoryPath(factory.id, section));
+
   return (
     <>
       <PageHeading
         eyebrow={eyebrow(factory)}
-        title="Factory overview"
-        subtitle="A shared control room for the work moving through your software factory."
+        title={factory.name}
+        subtitle={factory.description || "Factory overview"}
         actions={
-          <Button variant="primary" onClick={() => demo("New work item")}>
-            New work item
-          </Button>
+          <>
+            <Button onClick={() => demo("Edit goal and KPIs")}>
+              Edit goal & KPIs
+            </Button>
+            <Button variant="primary" onClick={() => go("stream")}>
+              Open work stream
+            </Button>
+          </>
         }
       />
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Stat label="Active work" value="9" hint="Across 2 repositories" />
-        <Stat
-          label="Blocked"
-          value="5"
-          hint="17 auto-resolved by rules this week"
-        />
-        <Stat label="PRs merged" value="27" hint="+18% against prior period" />
-        <Stat
-          label="Median cost / PR"
-          value="$18.42"
-          hint="Compute + inference estimate"
-        />
-      </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardTitle>Throughput · last 30 days</CardTitle>
-          <Bars values={THROUGHPUT} />
-          <div className="mt-2 flex justify-between text-2xs text-muted">
-            <span>Oct 24</span>
-            <span>Nov 23</span>
+
+      <Card className="p-5">
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-2xs font-semibold uppercase tracking-wider text-muted">
+              Goal
+            </div>
+            <p className="mt-1.5 text-base leading-relaxed text-content">
+              {factory.goal || "No goal set yet."}
+            </p>
           </div>
+          <div className="flex flex-wrap gap-1.5">
+            {factory.owner ? <Badge>Owner · {factory.owner}</Badge> : null}
+            <Badge>{factory.tag}</Badge>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {factory.kpis.length ? (
+            factory.kpis.map((k) => (
+              <div
+                key={k.label}
+                className="rounded-lg border border-border px-3 py-2.5"
+              >
+                <Muted>{k.label}</Muted>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-semibold text-content">
+                    {k.value}
+                  </span>
+                  <Badge tone={k.onTrack ? "good" : "warn"}>
+                    target {k.target}
+                  </Badge>
+                </div>
+              </div>
+            ))
+          ) : (
+            <button
+              type="button"
+              onClick={() => demo("Add a KPI")}
+              className="cursor-pointer rounded-lg border border-dashed border-border px-3 py-4 text-left text-sm text-muted hover:text-content"
+            >
+              + Add a KPI to measure this factory against its goal
+            </button>
+          )}
+        </div>
+      </Card>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardTitle>Primary agent</CardTitle>
+          {orchestrator ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(factoryAgentPath(factory.id, orchestrator.id))
+                }
+                className="flex w-full cursor-pointer items-center gap-3 text-left"
+              >
+                <div className="grid size-9 place-items-center rounded-lg border border-border bg-surface-raised text-xs font-bold text-muted">
+                  FC
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-content">
+                    {orchestrator.name}
+                  </div>
+                  <Muted>acts as {orchestrator.runsAs}</Muted>
+                </div>
+              </button>
+              <p className="mt-3 text-sm text-muted">
+                Watching 5 blocked items · applied 3 rules today · next summary
+                at 17:00
+              </p>
+            </>
+          ) : (
+            <>
+              <Muted>
+                No orchestrator. This factory is driven by its automations.
+              </Muted>
+              <div className="mt-3">
+                <Button size="sm" onClick={() => go("agents")}>
+                  Assign a primary agent
+                </Button>
+              </div>
+            </>
+          )}
         </Card>
         <Card>
           <div className="mb-3 flex items-center">
             <h3 className="text-sm font-semibold text-content">Flow health</h3>
             <div className="flex-1" />
-            <Button
-              size="sm"
-              onClick={() => navigate(factoryPath(factory.id, "operator"))}
-            >
+            <Button size="sm" onClick={() => go("operator")}>
               Operator view →
             </Button>
           </div>
           <div className="mb-1 flex items-baseline gap-2">
             <span className="text-2xl font-semibold text-content">87%</span>
-            <Muted>of work moved without a person this week</Muted>
+            <Muted>moved without a person this week</Muted>
           </div>
           {BLOCKER_PATTERNS.filter((p) => p.blockedNow > 0)
             .slice(0, 3)
             .map((p) => (
-              <Row
-                key={p.id}
-                onClick={() => navigate(factoryPath(factory.id, "operator"))}
-              >
+              <Row key={p.id} onClick={() => go("operator")}>
                 <div>
                   <div className="font-medium text-content">{p.cause}</div>
-                  <Muted className="mt-1">
-                    {p.blockedNow} blocked · {p.last7d} in 7 days
-                  </Muted>
+                  <Muted className="mt-1">{p.blockedNow} blocked now</Muted>
                 </div>
                 <Badge
                   tone={
@@ -200,118 +226,52 @@ export function OverviewPage({ factory }: FactoryPageProps) {
               </Row>
             ))}
         </Card>
+        <Card>
+          <CardTitle>Merged PRs · last 30 days</CardTitle>
+          <Bars values={THROUGHPUT} />
+          <div className="mt-2 flex justify-between text-2xs text-muted">
+            <span>Oct 24</span>
+            <span>Nov 23</span>
+          </div>
+        </Card>
       </div>
-      <SectionTitle
-        right={
-          <Button
-            size="sm"
-            onClick={() => navigate(factoryPath(factory.id, "queue"))}
-          >
-            Open full work queue →
-          </Button>
-        }
-      >
-        Production line
-      </SectionTitle>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        {WORK_STAGES.map((s, i) => (
-          <Card
-            key={s.stage}
-            tight
-            onClick={() => navigate(factoryPath(factory.id, "queue"))}
-          >
-            <Muted>0{i + 1}</Muted>
-            <div className="mt-1.5 text-sm font-medium text-content">
-              {s.label}
-            </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {(
+          [
+            ["Agents", AGENTS.length, "agents"],
+            ["Automations", AUTOMATIONS.length, "automations"],
+            [
+              "Active conversations",
+              FACTORY_CONVERSATIONS.filter((c) => c.status !== "Idle").length,
+              "conversations",
+            ],
+            ["Issues & PRs", EXTERNAL_REFS.length, "stream"],
+          ] as const
+        ).map(([label, count, section]) => (
+          <Card key={label} tight onClick={() => go(section)}>
+            <Muted>{label}</Muted>
             <div className="mt-1 text-2xl font-semibold text-content">
-              {WORK_ITEMS.filter((w) => w.stage === s.stage).length}
+              {count}
             </div>
-            <Muted>work items</Muted>
           </Card>
         ))}
       </div>
-    </>
-  );
-}
 
-type QueueFilter = "all" | "high" | "mine";
-
-export function QueuePage({ factory }: FactoryPageProps) {
-  const [filter, setFilter] = React.useState<QueueFilter>("all");
-  const { demo } = useFactoryDrawer();
-  const openWork = useOpenWorkItem(factory);
-  const visible = WORK_ITEMS.filter(
-    (w) =>
-      filter === "all" ||
-      (filter === "high" && w.priority === "High") ||
-      (filter === "mine" && (w.stage === "review" || w.stage === "plan")),
-  );
-  return (
-    <>
-      <PageHeading
-        eyebrow={eyebrow(factory)}
-        title="Work queue"
-        subtitle="Follow each work item from intake to a verified deliverable."
-        actions={
-          <Button variant="primary" onClick={() => demo("Add work")}>
-            Add work
+      <SectionTitle
+        right={
+          <Button size="sm" onClick={() => go("stream")}>
+            Full work stream →
           </Button>
         }
-      />
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <FilterChips<QueueFilter>
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { value: "all", label: "All work" },
-            { value: "high", label: "High priority" },
-            { value: "mine", label: "Waiting on me" },
-          ]}
-        />
-        <div className="flex-1" />
-        <Muted>{visible.length} work items</Muted>
-      </div>
-      <div className="grid grid-cols-[repeat(5,minmax(190px,1fr))] gap-3 overflow-x-auto pb-2">
-        {WORK_STAGES.map((lane) => {
-          const items = visible.filter((w) => w.stage === lane.stage);
-          return (
-            <div
-              key={lane.stage}
-              className="min-h-105 rounded-xl border border-border bg-surface-raised/30 p-2.5"
-            >
-              <div className="flex items-center justify-between px-1 pb-3 pt-1 text-sm font-semibold text-content">
-                <span>{lane.label}</span>
-                <Badge>{items.length}</Badge>
-              </div>
-              <div className="flex flex-col gap-2.5">
-                {items.map((w) => (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => openWork(w)}
-                    className="cursor-pointer rounded-lg border border-border bg-canvas-base p-3 text-left shadow-sm transition-colors hover:border-contrast/30"
-                  >
-                    <Muted>
-                      {w.id} · {w.age}
-                    </Muted>
-                    <div className="mt-2 text-sm font-medium leading-snug text-content">
-                      {w.title}
-                    </div>
-                    <Muted className="mt-1.5">{w.source}</Muted>
-                    <div className="mt-3 flex items-center justify-between">
-                      <Badge tone={w.priority === "High" ? "warn" : "neutral"}>
-                        {w.priority}
-                      </Badge>
-                      <ChevronRight className="size-3.5 text-muted" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      >
+        Recent activity
+      </SectionTitle>
+      <Card>
+        {WORK_LOG.slice(0, 5).map((e) => (
+          <LogEntryRow key={e.id} entry={e} factoryId={factory.id} />
+        ))}
+      </Card>
     </>
   );
 }
