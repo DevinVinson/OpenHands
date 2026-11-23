@@ -28,6 +28,7 @@ import {
 } from "../factory-ui";
 import { eyebrow, type FactoryPageProps } from "./overview-pages";
 import { runTone } from "./observe-pages";
+import { EscalationPolicyCard } from "./operations";
 
 function ArtifactList({ items }: { items: string[] }) {
   const { demo } = useFactoryDrawer();
@@ -189,7 +190,7 @@ orchestrator: ${f.orchestratorId ?? "null"}
 repositories:
 ${f.repositories.map((r) => `  - ${r}`).join("\n")}
 integrations: [${f.integrations.join(", ")}]
-${FACTORY_YAML.slice(FACTORY_YAML.indexOf("blueprint:"))}`;
+${FACTORY_YAML.slice(FACTORY_YAML.indexOf("workflows:"))}`;
 }
 
 export function SettingsPage({
@@ -274,7 +275,8 @@ export function SettingsPage({
               </Button>
             </div>
           </Card>
-          <Card className="md:col-span-2">
+          <EscalationPolicyCard />
+          <Card>
             <CardTitle>Danger zone</CardTitle>
             <div className="flex flex-wrap items-center gap-3">
               <Muted className="flex-1">

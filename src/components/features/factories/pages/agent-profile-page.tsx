@@ -11,7 +11,7 @@ import type { SettingsValue } from "#/types/settings";
 import { useNavigation } from "#/context/navigation-context";
 import {
   AUTOMATIONS,
-  BLUEPRINT_STAGES,
+  WORKFLOW_NODES,
   RUNS,
   factoryPath,
   factoryRunPath,
@@ -88,7 +88,9 @@ export function AgentProfilePage({
     );
   }
 
-  const stages = BLUEPRINT_STAGES.filter((s) => s.agent === agent.name);
+  const stages = WORKFLOW_NODES.filter(
+    (n) => n.kind === "stage" && n.detail === agent.name,
+  );
   const automations = AUTOMATIONS.filter((a) => a.agent === agent.name);
   const runs = RUNS.filter((r) => r.agent === agent.name);
 
@@ -164,16 +166,14 @@ export function AgentProfilePage({
         <div className="w-full shrink-0 lg:w-80">
           <Card>
             <CardTitle>Used in this factory</CardTitle>
-            <Muted className="mb-2">Blueprint stages</Muted>
+            <Muted className="mb-2">Workflow stations</Muted>
             {stages.length ? (
               stages.map((s) => (
                 <Row
-                  key={s.name}
-                  onClick={() => navigate(factoryPath(factory.id, "blueprint"))}
+                  key={s.id}
+                  onClick={() => navigate(factoryPath(factory.id, "workflows"))}
                 >
-                  <span className="text-content">
-                    {s.num} · {s.name}
-                  </span>
+                  <span className="text-content">{s.label}</span>
                   <span className="text-muted">›</span>
                 </Row>
               ))

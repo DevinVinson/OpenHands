@@ -21,7 +21,6 @@ import {
 } from "#/components/features/factories/pages/overview-pages";
 import {
   AutomationsPage,
-  BlueprintPage,
   AgentsPage,
 } from "#/components/features/factories/pages/build-pages";
 import {
@@ -39,7 +38,7 @@ import {
   RefDetailPage,
   WorkStreamPage,
 } from "#/components/features/factories/pages/stream-pages";
-import { OperatorPage } from "#/components/features/factories/pages/operator-page";
+import { WorkflowsPage } from "#/components/features/factories/pages/workflows-page";
 import { useNavigation } from "#/context/navigation-context";
 
 const SECTION_PAGES: Record<
@@ -49,8 +48,7 @@ const SECTION_PAGES: Record<
   overview: OverviewPage,
   stream: WorkStreamPage,
   conversations: ConversationsPage,
-  operator: OperatorPage,
-  blueprint: BlueprintPage,
+  workflows: WorkflowsPage,
   automations: AutomationsPage,
   agents: AgentsPage,
   runs: RunsPage,

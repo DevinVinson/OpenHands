@@ -1,15 +1,13 @@
 /* eslint-disable i18next/no-literal-string -- PROTOTYPE: wireframe copy, not yet localized. */
 import React from "react";
-import { cn } from "#/utils/utils";
 import { useNavigation } from "#/context/navigation-context";
 import {
   AUTOMATIONS,
-  RECOMMENDED_AUTOMATIONS,
-  BLUEPRINT_STAGES,
+  ADD_ON_STATIONS,
+  FACTORY_SETTINGS,
   AGENTS,
   factoryAgentPath,
   type AutomationRecord,
-  type BlueprintStage,
   type Agent,
 } from "../factory-data";
 import {
@@ -25,127 +23,108 @@ import {
   SectionTitle,
   Table,
   useFactoryDrawer,
+  type Tone,
 } from "../factory-ui";
 import { eyebrow, type FactoryPageProps } from "./overview-pages";
 
-export function BlueprintPage({ factory }: FactoryPageProps) {
-  const { open, demo } = useFactoryDrawer();
-  const [selected, setSelected] = React.useState<string | null>(null);
+const PHASE_LABEL: Record<AutomationRecord["phase"], string> = {
+  "Phase 1": "Phase 1",
+  "Add-on": "Skill add-on",
+  Catalog: "Automation catalog",
+  Concept: "Concept · not built yet",
+};
 
-  const openStage = (s: BlueprintStage) => {
-    setSelected(s.name);
-    open(
-      `${s.name} ${s.gate ? "gate" : "stage"}`,
-      <>
-        <Field label={s.gate ? "Approver" : "Assigned agent"}>
-          {s.gate ? "Factory maintainers" : s.agent}
-        </Field>
-        <Field label="Procedure">
-          <div className="min-h-24 text-muted">
-            {s.gate
-              ? "Pause the work item until a maintainer approves the plan. Attach the spec, risk analysis and open questions."
-              : "Describe the work this stage must perform, its required inputs, and the outputs needed before a transition."}
-          </div>
-        </Field>
-        <Field label="Transition on success">Next stage</Field>
-        <Field label="Transition on revisions">Previous stage</Field>
-        <div className="my-4 h-px bg-border" />
-        <Button variant="primary" onClick={() => demo("Edit stage")}>
-          Edit stage
-        </Button>
-      </>,
-    );
-  };
+const PHASE_TONE: Record<AutomationRecord["phase"], Tone> = {
+  "Phase 1": "info",
+  "Add-on": "good",
+  Catalog: "neutral",
+  Concept: "warn",
+};
 
+const ADD_GROUPS: {
+  phases: AutomationRecord["phase"][];
+  title: string;
+  hint: string;
+}[] = [
+  {
+    phases: ["Add-on", "Catalog"],
+    title: "Ready to add",
+    hint: "Software-factory add-on and other catalog bundles",
+  },
+  {
+    phases: ["Concept"],
+    title: "Example stations",
+    hint: "Concepts for this kind of factory, not in the catalog yet",
+  },
+];
+
+function StationDetail({
+  a,
+  installed,
+}: {
+  a: AutomationRecord;
+  installed: boolean;
+}) {
+  const { demo } = useFactoryDrawer();
   return (
     <>
-      <PageHeading
-        eyebrow={eyebrow(factory)}
-        title="Workflow blueprint"
-        subtitle="Define who handles each stage, how work moves, and where people approve."
-        actions={
-          <Button variant="primary" onClick={() => demo("Edit workflow")}>
-            Edit workflow
-          </Button>
-        }
-      />
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Badge tone="good">Published v1.4</Badge>
-        <Badge>8 transitions</Badge>
-        <Badge>2 human gates</Badge>
-        <div className="flex-1" />
-        <Muted>Select a node to inspect its settings</Muted>
+      <div className="flex flex-wrap gap-1.5">
+        <Badge tone={PHASE_TONE[a.phase]}>{PHASE_LABEL[a.phase]}</Badge>
+        {installed ? <Badge>software-factory</Badge> : null}
+        <Badge>
+          {a.needsProfile ? "Uses agent profile" : "Catalog defaults"}
+        </Badge>
       </div>
-      <div
-        className="overflow-auto rounded-xl border border-border p-8"
-        style={{
-          backgroundImage:
-            "radial-gradient(var(--color-border) 0.8px, transparent 0.8px)",
-          backgroundSize: "18px 18px",
-        }}
+      <Field
+        label={a.phase === "Concept" ? "Proposed catalog id" : "Catalog bundle"}
       >
-        <div className="flex min-w-[1010px] items-center">
-          {BLUEPRINT_STAGES.map((s, i) => (
-            <React.Fragment key={s.name}>
-              {i > 0 ? (
-                <div className="relative h-px w-8 shrink-0 bg-muted/50">
-                  <span className="absolute -right-0.5 -top-2.5 text-muted">
-                    ›
-                  </span>
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => openStage(s)}
-                className={cn(
-                  "min-h-28 w-36 shrink-0 cursor-pointer rounded-lg border p-3 text-left shadow-sm transition-colors",
-                  s.gate
-                    ? "border-warning/50 bg-warning-soft/60"
-                    : "border-border bg-canvas-base hover:border-contrast/30",
-                  selected === s.name && "outline-2 outline-primary",
-                )}
-              >
-                <div className="text-3xs text-muted">
-                  {s.num} · {s.gate ? "GATE" : "STAGE"}
-                </div>
-                <div className="mb-1.5 mt-2 text-sm font-semibold text-content">
-                  {s.name}
-                </div>
-                <div className="text-2xs text-muted">{s.agent}</div>
-              </button>
-            </React.Fragment>
-          ))}
+        <span className="font-mono">{a.catalogId}</span>
+      </Field>
+      <Field label="Schedule">
+        {a.schedule}{" "}
+        {a.cron !== "webhook" ? (
+          <span className="font-mono text-muted">({a.cron})</span>
+        ) : null}
+      </Field>
+      <Field label="Starts on">{a.trigger}</Field>
+      <Field label="Produces">{a.outcome}</Field>
+      <Field label="Runs as">{a.agent}</Field>
+      {a.confirm ? (
+        <div className="mt-4">
+          <Note>
+            <b>
+              {a.phase === "Concept"
+                ? "Setup would ask:"
+                : "The skill asks before adding it:"}
+            </b>{" "}
+            {a.confirm}
+          </Note>
         </div>
-        <div className="mt-14 flex flex-wrap gap-3">
-          <div className="max-w-sm">
-            <Note>
-              ↶ Review findings can route work back to implementation,
-              preserving the agent conversation and attached evidence.
-            </Note>
-          </div>
-          <div className="max-w-sm">
-            <Note>
-              ◇ Human gates pause work until an answer is recorded; approval is
-              not the same as repository merge authorization.
-            </Note>
-          </div>
+      ) : null}
+      <div className="my-4 h-px bg-border" />
+      {installed ? (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" onClick={() => demo("Tune station")}>
+            Tune
+          </Button>
+          <Button onClick={() => demo("Verify: dispatch once and report")}>
+            Verify
+          </Button>
         </div>
-      </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
-        {[
-          [
-            "Entry rules",
-            "Choose stages from event type, labels and confidence",
-          ],
-          ["Transition policy", "Explicit conditions and revision loops"],
-          ["Versioning", "New work uses the active Blueprint version"],
-        ].map(([t, d]) => (
-          <Card key={t} onClick={() => demo(t)}>
-            <CardTitle>{t}</CardTitle>
-            <Muted>{d}</Muted>
-          </Card>
-        ))}
-      </div>
+      ) : (
+        <Button
+          variant="primary"
+          onClick={() =>
+            demo(
+              a.phase === "Concept"
+                ? `Propose ${a.name} for the catalog`
+                : `Add ${a.name}`,
+            )
+          }
+        >
+          {a.phase === "Concept" ? "Request this station" : "Add station"}
+        </Button>
+      )}
     </>
   );
 }
@@ -155,55 +134,54 @@ export function AutomationsPage({ factory }: FactoryPageProps) {
   const [enabled, setEnabled] = React.useState<Record<string, boolean>>(() =>
     Object.fromEntries(AUTOMATIONS.map((a) => [a.name, a.enabled])),
   );
-
-  const openAutomation = (a: AutomationRecord) =>
-    open(
-      a.name,
-      <>
-        <Field label="Trigger">{a.trigger}</Field>
-        <Field label="Event filters">
-          <div>Repository: api-service</div>
-          <div>Branch: main</div>
-        </Field>
-        <Field label="Target">
-          {a.agent} → enters Blueprint at <b>Triage</b>
-        </Field>
-        <div className="mt-4 text-xs font-semibold text-muted">Execution</div>
-        <p className="mt-1 text-sm text-content">
-          Run once for every matching event; deduplicate retries using the event
-          identity.
-        </p>
-        <div className="my-4 h-px bg-border" />
-        <Button variant="primary" onClick={() => demo("Edit automation")}>
-          Edit automation
-        </Button>
-      </>,
-    );
+  const openStation = (a: AutomationRecord, installed: boolean) =>
+    open(a.name, <StationDetail a={a} installed={installed} />);
 
   return (
     <>
       <PageHeading
         eyebrow={eyebrow(factory)}
         title="Automations"
-        subtitle="Events, filters and schedules determine what starts factory work."
+        subtitle="The stations the software-factory skill set up: each is an automation-catalog bundle tagged software-factory."
         actions={
-          <Button variant="primary" onClick={() => demo("New automation")}>
-            New automation
-          </Button>
+          <>
+            <Button
+              onClick={() => demo("Run /software-factory to tune or extend")}
+            >
+              Run /software-factory
+            </Button>
+            <Button variant="primary" onClick={() => demo("New automation")}>
+              New automation
+            </Button>
+          </>
         }
       />
       <Table<AutomationRecord>
         rows={AUTOMATIONS}
-        rowKey={(r) => r.name}
-        onRowClick={openAutomation}
+        rowKey={(r) => r.catalogId}
+        onRowClick={(r) => openStation(r, true)}
         columns={[
           {
-            header: "Name",
-            width: "28%",
-            render: (r) => <span className="font-medium">{r.name}</span>,
+            header: "Station",
+            width: "22%",
+            render: (r) => (
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 font-medium">
+                  {r.name}
+                </div>
+                <Muted className="mt-0.5 truncate font-mono">
+                  {r.catalogId}
+                </Muted>
+              </div>
+            ),
           },
-          { header: "Trigger", render: (r) => r.trigger },
-          { header: "Target agent", render: (r) => r.agent },
+          {
+            header: "Starts on",
+            width: "30%",
+            render: (r) => <span className="text-muted">{r.trigger}</span>,
+          },
+          { header: "Schedule", render: (r) => r.schedule },
+          { header: "Agent", render: (r) => r.agent },
           {
             header: "Status",
             render: (r) => (
@@ -224,53 +202,84 @@ export function AutomationsPage({ factory }: FactoryPageProps) {
           { header: "Last 30d", render: (r) => `${r.runs} runs` },
         ]}
       />
-      <SectionTitle right={<Muted>From the template library</Muted>}>
-        Recommended for this factory
-      </SectionTitle>
-      <div className="grid gap-4 md:grid-cols-3">
-        {RECOMMENDED_AUTOMATIONS.map((r) => (
-          <Card key={r.name}>
-            <div className="text-sm font-semibold text-content">{r.name}</div>
-            <Muted className="mt-1 min-h-8">{r.why}</Muted>
-            <div className="mt-3 flex items-center gap-2">
-              <Muted className="flex-1">Runs as {r.agent}</Muted>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => demo(`Add “${r.name}” and customize`)}
-              >
-                Add
-              </Button>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <Card>
+          <CardTitle>How work flows</CardTitle>
+          <ol className="flex flex-wrap items-center gap-2 text-sm text-content">
+            {[
+              "Issue triage marks it ready",
+              "Label it openhands",
+              "Issue to PR opens a draft PR",
+              "PR reviewer reviews it",
+              "QA changes exercises it",
+              "Watchdog merges when green",
+            ].map((step, i) => (
+              <li key={step} className="flex items-center gap-2">
+                {i > 0 ? <span className="text-muted">→</span> : null}
+                <span className="rounded-md border border-border px-2 py-1">
+                  {step}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <Muted className="mt-3">
+            The stale-CI closer warns on, then closes, PRs whose CI keeps
+            failing, so abandoned work doesn&apos;t pile up.
+          </Muted>
+        </Card>
+        <Card>
+          <div className="mb-2 flex items-center">
+            <h3 className="text-sm font-semibold text-content">
+              Settings in effect
+            </h3>
+            <div className="flex-1" />
+            <Button size="sm" onClick={() => demo("Tune factory settings")}>
+              Tune
+            </Button>
+          </div>
+          {FACTORY_SETTINGS.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-3 py-1 text-xs">
+              <span className="text-muted">{k}</span>
+              <span className="text-right font-mono text-content">{v}</span>
             </div>
-          </Card>
-        ))}
+          ))}
+        </Card>
       </div>
-      <SectionTitle
-        right={
-          <Button size="sm" onClick={() => demo("Add webhook")}>
-            Add webhook
-          </Button>
-        }
-      >
-        Webhooks
-      </SectionTitle>
-      <div className="grid gap-4 md:grid-cols-2">
-        {[
-          ["Incident receiver", "/api/hooks/incident · signed payload"],
-          ["Deployment events", "/api/hooks/deploy · 7 deliveries today"],
-        ].map(([t, d]) => (
-          <Card key={t}>
-            <div className="flex items-center gap-3">
-              <div>
-                <div className="text-sm font-semibold text-content">{t}</div>
-                <Muted className="mt-1">{d}</Muted>
-              </div>
-              <div className="flex-1" />
-              <Badge tone="good">Healthy</Badge>
-            </div>
-          </Card>
-        ))}
-      </div>
+
+      {ADD_GROUPS.map((g) => (
+        <React.Fragment key={g.title}>
+          <SectionTitle right={<Muted>{g.hint}</Muted>}>
+            {g.title === "Ready to add" ? "Add a station" : g.title}
+          </SectionTitle>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {ADD_ON_STATIONS.filter((r) => g.phases.includes(r.phase)).map(
+              (r) => (
+                <Card key={r.catalogId} onClick={() => openStation(r, false)}>
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 text-sm font-semibold text-content">
+                      {r.name}
+                    </div>
+                    <Badge tone={PHASE_TONE[r.phase]}>
+                      {r.phase === "Concept"
+                        ? "Concept"
+                        : r.phase === "Add-on"
+                          ? "Skill add-on"
+                          : "Catalog"}
+                    </Badge>
+                  </div>
+                  <Muted className="mt-1 min-h-12">{r.outcome}</Muted>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Muted className="flex-1">
+                      {r.schedule} · {r.agent}
+                    </Muted>
+                  </div>
+                </Card>
+              ),
+            )}
+          </div>
+        </React.Fragment>
+      ))}
     </>
   );
 }

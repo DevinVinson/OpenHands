@@ -281,7 +281,7 @@ export function CreateFactoryModal({ onClose }: { onClose: () => void }) {
           <>
             <p className="mt-4 text-sm text-muted">
               Everything that makes up this factory (goal, agents, automations,
-              blueprint) is stored as files in a repository. Changes made in
+              workflows) is stored as files in a repository. Changes made in
               Canvas open as pull requests.
             </p>
             <Label>Repository</Label>
@@ -322,7 +322,7 @@ export function CreateFactoryModal({ onClose }: { onClose: () => void }) {
             <pre className="mt-3 rounded-lg bg-surface-deep p-3 font-mono text-xs leading-relaxed text-muted">
               {`${defRepo === NEW_REPO ? newRepoName : defRepo}/${defPath.trim() || `${slug}/`}
 ├── factory.yaml      # name, goal, KPIs, owner
-├── blueprint.yaml
+├── workflows.yaml
 ├── agents/
 └── automations/`}
             </pre>

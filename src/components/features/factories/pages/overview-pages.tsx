@@ -2,11 +2,6 @@
 import React from "react";
 import { useNavigation } from "#/context/navigation-context";
 import {
-  AGENTS,
-  AUTOMATIONS,
-  BLOCKER_PATTERNS,
-  EXTERNAL_REFS,
-  FACTORY_CONVERSATIONS,
   THROUGHPUT,
   WORK_LOG,
   factoryAgentPath,
@@ -20,17 +15,20 @@ import {
 } from "../factory-data";
 import {
   Badge,
-  Bars,
   Button,
   Card,
   CardTitle,
   Muted,
   PageHeading,
-  Row,
-  SectionTitle,
   useFactoryDrawer,
 } from "../factory-ui";
 import { LogEntryRow } from "./stream-pages";
+import {
+  BlockerPatternsCard,
+  EscalationsCard,
+  FlowStats,
+  NewRuleButton,
+} from "./operations";
 
 export interface FactoryPageProps {
   factory: Factory;
@@ -82,6 +80,34 @@ export function useOpenAttention(factory: Factory) {
     );
 }
 
+/** Tiny trend line for a KPI. */
+function Sparkline({ values }: { values: number[] }) {
+  const w = 80;
+  const h = 26;
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const pts = values
+    .map(
+      (v, i) =>
+        `${(i / (values.length - 1)) * w},${h - ((v - min) / (max - min || 1)) * (h - 4) - 2}`,
+    )
+    .join(" ");
+  return (
+    <svg width={w} height={h} className="shrink-0 text-primary" aria-hidden>
+      <polyline
+        points={pts}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+/**
+ * The factory's home page and operator view in one: is it reaching its
+ * goal, is work moving, what needs a person, and why work gets stuck.
+ */
 export function OverviewPage({ factory }: FactoryPageProps) {
   const { navigate } = useNavigation();
   const { demo } = useFactoryDrawer();
@@ -107,44 +133,48 @@ export function OverviewPage({ factory }: FactoryPageProps) {
         }
       />
 
-      <Card className="p-5">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="min-w-0 flex-1">
+      {/* 1. Is it reaching its goal? */}
+      <Card className="p-4">
+        <div className="grid gap-4 xl:grid-cols-5">
+          <div className="min-w-0 xl:col-span-2">
             <div className="text-2xs font-semibold uppercase tracking-wider text-muted">
               Goal
             </div>
-            <p className="mt-1.5 text-base leading-relaxed text-content">
+            <p className="mt-1 text-sm leading-relaxed text-content">
               {factory.goal || "No goal set yet."}
             </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {factory.owner ? <Badge>Owner · {factory.owner}</Badge> : null}
+              <Badge>{factory.tag}</Badge>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {factory.owner ? <Badge>Owner · {factory.owner}</Badge> : null}
-            <Badge>{factory.tag}</Badge>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {factory.kpis.length ? (
-            factory.kpis.map((k) => (
-              <div
-                key={k.label}
-                className="rounded-lg border border-border px-3 py-2.5"
-              >
-                <Muted>{k.label}</Muted>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-2xl font-semibold text-content">
-                    {k.value}
-                  </span>
-                  <Badge tone={k.onTrack ? "good" : "warn"}>
-                    target {k.target}
-                  </Badge>
+            <div className="grid gap-2 sm:grid-cols-3 xl:col-span-3">
+              {factory.kpis.map((k, i) => (
+                <div
+                  key={k.label}
+                  className="flex min-w-0 flex-col rounded-lg border border-border px-3 py-2"
+                >
+                  <Muted className="truncate">{k.label}</Muted>
+                  <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2">
+                    <span className="text-xl font-semibold text-content">
+                      {k.value}
+                    </span>
+                    {i === 0 ? <Sparkline values={THROUGHPUT} /> : null}
+                  </div>
+                  <div className="mt-1">
+                    <Badge tone={k.onTrack ? "good" : "warn"}>
+                      target {k.target}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
             <button
               type="button"
               onClick={() => demo("Add a KPI")}
-              className="cursor-pointer rounded-lg border border-dashed border-border px-3 py-4 text-left text-sm text-muted hover:text-content"
+              className="cursor-pointer rounded-lg border border-dashed border-border px-3 py-4 text-left text-sm text-muted hover:text-content xl:col-span-3"
             >
               + Add a KPI to measure this factory against its goal
             </button>
@@ -152,126 +182,88 @@ export function OverviewPage({ factory }: FactoryPageProps) {
         </div>
       </Card>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardTitle>Primary agent</CardTitle>
-          {orchestrator ? (
-            <>
-              <button
-                type="button"
-                onClick={() =>
-                  navigate(factoryAgentPath(factory.id, orchestrator.id))
-                }
-                className="flex w-full cursor-pointer items-center gap-3 text-left"
-              >
-                <div className="grid size-9 place-items-center rounded-lg border border-border bg-surface-raised text-xs font-bold text-muted">
-                  FC
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-content">
-                    {orchestrator.name}
-                  </div>
-                  <Muted>acts as {orchestrator.runsAs}</Muted>
-                </div>
-              </button>
-              <p className="mt-3 text-sm text-muted">
-                Watching 5 blocked items · applied 3 rules today · next summary
-                at 17:00
-              </p>
-            </>
-          ) : (
-            <>
-              <Muted>
-                No orchestrator. This factory is driven by its automations.
-              </Muted>
-              <div className="mt-3">
-                <Button size="sm" onClick={() => go("agents")}>
-                  Assign a primary agent
-                </Button>
-              </div>
-            </>
-          )}
-        </Card>
-        <Card>
-          <div className="mb-3 flex items-center">
-            <h3 className="text-sm font-semibold text-content">Flow health</h3>
-            <div className="flex-1" />
-            <Button size="sm" onClick={() => go("operator")}>
-              Operator view →
-            </Button>
+      {/* 2. Is work moving? */}
+      <div className="mt-4">
+        <FlowStats />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-4 xl:flex-row">
+        <div className="min-w-0 flex-1">
+          {/* 3. What needs me? */}
+          <EscalationsCard factory={factory} />
+
+          {/* 4. Why does it get stuck? */}
+          <div className="mt-4">
+            <BlockerPatternsCard
+              actions={
+                <>
+                  <NewRuleButton size="sm" />
+                  <Button size="sm" onClick={() => go("workflows")}>
+                    All rules →
+                  </Button>
+                </>
+              }
+            />
           </div>
-          <div className="mb-1 flex items-baseline gap-2">
-            <span className="text-2xl font-semibold text-content">87%</span>
-            <Muted>moved without a person this week</Muted>
-          </div>
-          {BLOCKER_PATTERNS.filter((p) => p.blockedNow > 0)
-            .slice(0, 3)
-            .map((p) => (
-              <Row key={p.id} onClick={() => go("operator")}>
-                <div>
-                  <div className="font-medium text-content">{p.cause}</div>
-                  <Muted className="mt-1">{p.blockedNow} blocked now</Muted>
-                </div>
-                <Badge
-                  tone={
-                    p.coverage === "Covered"
-                      ? "good"
-                      : p.coverage === "Partial"
-                        ? "warn"
-                        : "bad"
+        </div>
+
+        {/* 5. Side column */}
+        <div className="grid w-full shrink-0 content-start items-start gap-4 md:grid-cols-2 xl:w-80 xl:grid-cols-1">
+          <Card>
+            <CardTitle>Primary agent</CardTitle>
+            {orchestrator ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(factoryAgentPath(factory.id, orchestrator.id))
                   }
+                  className="flex w-full cursor-pointer items-center gap-3 text-left"
                 >
-                  {p.coverage}
-                </Badge>
-              </Row>
-            ))}
-        </Card>
-        <Card>
-          <CardTitle>Merged PRs · last 30 days</CardTitle>
-          <Bars values={THROUGHPUT} />
-          <div className="mt-2 flex justify-between text-2xs text-muted">
-            <span>Oct 24</span>
-            <span>Nov 23</span>
-          </div>
-        </Card>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {(
-          [
-            ["Agents", AGENTS.length, "agents"],
-            ["Automations", AUTOMATIONS.length, "automations"],
-            [
-              "Active conversations",
-              FACTORY_CONVERSATIONS.filter((c) => c.status !== "Idle").length,
-              "conversations",
-            ],
-            ["Issues & PRs", EXTERNAL_REFS.length, "stream"],
-          ] as const
-        ).map(([label, count, section]) => (
-          <Card key={label} tight onClick={() => go(section)}>
-            <Muted>{label}</Muted>
-            <div className="mt-1 text-2xl font-semibold text-content">
-              {count}
-            </div>
+                  <div className="grid size-9 place-items-center rounded-lg border border-border bg-surface-raised text-xs font-bold text-muted">
+                    FC
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-content">
+                      {orchestrator.name}
+                    </div>
+                    <Muted>acts as {orchestrator.runsAs}</Muted>
+                  </div>
+                </button>
+                <p className="mt-3 text-sm text-muted">
+                  Watching 5 blocked items · applied 3 rules today · next
+                  summary at 17:00
+                </p>
+              </>
+            ) : (
+              <>
+                <Muted>
+                  No orchestrator. This factory is driven by its automations.
+                </Muted>
+                <div className="mt-3">
+                  <Button size="sm" onClick={() => go("agents")}>
+                    Assign a primary agent
+                  </Button>
+                </div>
+              </>
+            )}
           </Card>
-        ))}
+          <Card>
+            <div className="mb-1 flex items-center">
+              <h3 className="text-sm font-semibold text-content">
+                Recent activity
+              </h3>
+              <div className="flex-1" />
+              <Button size="sm" variant="ghost" onClick={() => go("stream")}>
+                All →
+              </Button>
+            </div>
+            {WORK_LOG.slice(0, 5).map((e) => (
+              <LogEntryRow key={e.id} entry={e} factoryId={factory.id} />
+            ))}
+          </Card>
+        </div>
       </div>
-
-      <SectionTitle
-        right={
-          <Button size="sm" onClick={() => go("stream")}>
-            Full work stream →
-          </Button>
-        }
-      >
-        Recent activity
-      </SectionTitle>
-      <Card>
-        {WORK_LOG.slice(0, 5).map((e) => (
-          <LogEntryRow key={e.id} entry={e} factoryId={factory.id} />
-        ))}
-      </Card>
     </>
   );
 }

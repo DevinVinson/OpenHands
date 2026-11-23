@@ -15,8 +15,7 @@ export type FactorySection =
   | "overview"
   | "stream"
   | "conversations"
-  | "operator"
-  | "blueprint"
+  | "workflows"
   | "automations"
   | "agents"
   | "runs"
@@ -57,30 +56,17 @@ export interface FactoryNavGroup {
 export const FACTORY_NAV_GROUPS: FactoryNavGroup[] = [
   {
     items: [
-      { section: "overview", label: "Overview" },
-      { section: "stream", label: "Work stream" },
-      { section: "conversations", label: "Conversations", count: 4 },
-      { section: "operator", label: "Operator view", count: 5 },
-    ],
-  },
-  {
-    label: "Build",
-    items: [
-      { section: "blueprint", label: "Workflow blueprint" },
+      { section: "overview", label: "Overview", count: 5 },
       { section: "automations", label: "Automations", count: 6 },
       { section: "agents", label: "Agents", count: 6 },
-    ],
-  },
-  {
-    label: "Observe",
-    items: [
+      { section: "conversations", label: "Conversations", count: 4 },
+      { section: "stream", label: "Work stream" },
+      { section: "workflows", label: "Workflows" },
       { section: "runs", label: "Runs", count: 24 },
       { section: "quality", label: "Quality & scorers" },
       { section: "benchmarks", label: "Benchmarks" },
+      { section: "settings", label: "Configuration" },
     ],
-  },
-  {
-    items: [{ section: "settings", label: "Configuration" }],
   },
 ];
 
@@ -311,9 +297,10 @@ export const WORK_LOG: WorkLogEntry[] = [
     minutesAgo: 1,
     when: "1m",
     source: "automation",
-    sourceName: "Issue opened",
+    sourceName: "Issue triage",
     type: "event",
-    summary: "New issue received and handed to Triage Agent",
+    summary:
+      "New issue prioritized with acceptance criteria; labelled openhands",
     refId: "api-482",
   },
   {
@@ -332,10 +319,10 @@ export const WORK_LOG: WorkLogEntry[] = [
     minutesAgo: 8,
     when: "8m",
     source: "automation",
-    sourceName: "Incident alert",
+    sourceName: "PR reviewer",
     type: "event",
-    summary: "Sentry alert linked to an existing issue",
-    refId: "web-3f1",
+    summary: "Scan found a PR labelled openhands-review; review started",
+    refId: "web-811",
   },
   {
     id: "l4",
@@ -623,6 +610,8 @@ export const BLOCKER_PATTERNS: BlockerPattern[] = [
 export interface ResolutionRule {
   id: string;
   name: string;
+  /** Workflow station the rule guards. */
+  stationId: string;
   when: string;
   then: string;
   escalate: string;
@@ -634,6 +623,7 @@ export interface ResolutionRule {
 export const RESOLUTION_RULES: ResolutionRule[] = [
   {
     id: "retry-flaky",
+    stationId: "qa",
     name: "Retry flaky CI",
     when: "CI fails on a test marked flaky, or passes on main",
     then: "Re-run up to 2×, then send back to Implementation with the logs",
@@ -644,6 +634,7 @@ export const RESOLUTION_RULES: ResolutionRule[] = [
   },
   {
     id: "ask-author",
+    stationId: "plan",
     name: "Clarify with issue author",
     when: "Planner confidence < 0.6 on requirements",
     then: "Planner posts questions on the source issue and waits",
@@ -654,6 +645,7 @@ export const RESOLUTION_RULES: ResolutionRule[] = [
   },
   {
     id: "budget-split",
+    stationId: "implement",
     name: "Split over-budget work",
     when: "A run's estimated cost passes $5",
     then: "Pause, split the work item and re-plan smaller steps",
@@ -664,6 +656,7 @@ export const RESOLUTION_RULES: ResolutionRule[] = [
   },
   {
     id: "stale-review",
+    stationId: "review",
     name: "Nudge stale reviews",
     when: "A PR waits in Review for more than 24h",
     then: "Re-request review from CODEOWNERS and post in Slack",
@@ -721,7 +714,7 @@ export const AGENTS: Agent[] = [
       name: "factory-triage",
       tools: ["terminal", "task_tracker"],
       instructions:
-        "Classify each incoming item by type, risk and affected repository. Never modify files. Route to the Blueprint stage that matches the classification.",
+        "Classify each incoming item by type, risk and affected repository. Never modify files. Route to the workflow stage that matches the classification.",
     },
   },
   {
@@ -790,82 +783,255 @@ export function factoryAgentPath(factoryId: string, agentId: string) {
   return `${factoryPath(factoryId, "agents")}/${encodeURIComponent(agentId)}`;
 }
 
+/**
+ * Software-factory stations: the automations the `software-factory` skill
+ * (OpenHands/extensions, skills/software-factory) creates from unmodified
+ * automation-catalog bundles, each tagged `software-factory`.
+ */
 export interface AutomationRecord {
   name: string;
+  catalogId: string;
+  /**
+   * Phase 1 = created by the skill's first pass; Add-on = the skill's
+   * Phase 2 stations; Catalog = another automation-catalog bundle;
+   * Concept = an example station that does not exist in the catalog yet.
+   */
+  phase: "Phase 1" | "Add-on" | "Catalog" | "Concept";
+  schedule: string;
+  cron: string;
+  /** What starts it, in the skill's checkpoint words. */
   trigger: string;
+  outcome: string;
   agent: string;
+  needsProfile: boolean;
   enabled: boolean;
   runs: number;
+  /** For add-ons: the question the skill asks before creating it. */
+  confirm?: string;
 }
 
 export const AUTOMATIONS: AutomationRecord[] = [
   {
-    name: "Issue opened",
-    trigger: "GitHub · issue opened",
-    agent: "Triage Agent",
-    enabled: true,
-    runs: 26,
-  },
-  {
-    name: "PR opened or updated",
-    trigger: "GitHub · PR event",
-    agent: "Review Agent",
-    enabled: true,
-    runs: 18,
-  },
-  {
-    name: "Nightly dependency scan",
-    trigger: "Schedule · 02:00 UTC",
-    agent: "Triage Agent",
-    enabled: true,
-    runs: 7,
-  },
-  {
-    name: "Failed CI workflow",
-    trigger: "GitHub · workflow failed",
+    name: "Issue to PR",
+    catalogId: "github-issue-to-pr",
+    phase: "Phase 1",
+    schedule: "Every 15 minutes",
+    cron: "*/15 * * * *",
+    trigger: "Open issue labelled openhands",
+    outcome: "Draft PR on an openhands/issue branch; addresses review feedback",
     agent: "Implementation Agent",
+    needsProfile: true,
     enabled: true,
-    runs: 14,
+    runs: 31,
   },
   {
-    name: "Incident alert",
-    trigger: "Webhook · incident.created",
+    name: "PR reviewer",
+    catalogId: "github-pr-reviewer",
+    phase: "Phase 1",
+    schedule: "Every 5 minutes",
+    cron: "*/5 * * * *",
+    trigger:
+      "Non-draft PR labelled openhands-review or requesting all-hands-bot; also green PRs with no review (max 2 per scan)",
+    outcome: "Concise review posted on GitHub",
+    agent: "Review Agent",
+    needsProfile: true,
+    enabled: true,
+    runs: 48,
+  },
+  {
+    name: "Issue triage",
+    catalogId: "github-issue-triage",
+    phase: "Phase 1",
+    schedule: "Every 5 minutes",
+    cron: "*/5 * * * *",
+    trigger: "Open issues",
+    outcome:
+      "Priority and acceptance criteria; marks issues ready for development",
     agent: "Triage Agent",
+    needsProfile: true,
     enabled: true,
-    runs: 4,
+    runs: 64,
   },
   {
-    name: "Weekly improvement digest",
-    trigger: "Schedule · Monday 08:00",
-    agent: "Planner",
-    enabled: false,
-    runs: 1,
+    name: "Auto-merge watchdog",
+    catalogId: "github-delivery-watchdog",
+    phase: "Add-on",
+    schedule: "Every 5 minutes",
+    cron: "*/5 * * * *",
+    trigger: "PRs on the openhands/issue branch prefix",
+    outcome: "Merges current heads with independent review, tests and green CI",
+    agent: "Factory Coordinator",
+    needsProfile: false,
+    enabled: true,
+    runs: 11,
+    confirm:
+      "Should the agent merge pull requests itself once review, tests and CI are green?",
+  },
+  {
+    name: "Stale-CI PR closer",
+    catalogId: "github-stale-ci-pr-closer",
+    phase: "Add-on",
+    schedule: "Hourly",
+    cron: "0 * * * *",
+    trigger: "Open PRs whose required CI keeps failing",
+    outcome: "Warns, then closes abandoned PRs",
+    agent: "Factory Coordinator",
+    needsProfile: false,
+    enabled: true,
+    runs: 9,
+    confirm: "May it warn on, then close, PRs whose CI keeps failing?",
+  },
+  {
+    name: "QA changes",
+    catalogId: "qa-changes",
+    phase: "Add-on",
+    schedule: "On PR events",
+    cron: "webhook",
+    trigger: "Pull request opened for review (needs webhook reachability)",
+    outcome: "Exercises the change as a real user would and posts QA results",
+    agent: "QA Agent",
+    needsProfile: false,
+    enabled: true,
+    runs: 17,
+    confirm: "Which base branch? (default main)",
   },
 ];
 
-export interface RecommendedAutomation {
-  name: string;
-  why: string;
-  agent: string;
-}
-
-/** From the template library, for this kind of factory. */
-export const RECOMMENDED_AUTOMATIONS: RecommendedAutomation[] = [
+/**
+ * Stations not yet in this factory: the skill's remaining add-on, other
+ * catalog bundles, and example concepts that don't exist yet.
+ */
+export const ADD_ON_STATIONS: AutomationRecord[] = [
   {
-    name: "Stale PR nudge",
-    why: "PRs wait 26h on average in review",
-    agent: "Factory Coordinator",
+    name: "AGENTS.md maintainer",
+    catalogId: "github-agents-md-maintainer",
+    phase: "Add-on",
+    schedule: "Mondays 09:00 UTC",
+    cron: "0 9 * * 1",
+    trigger: "Weekly, per repository",
+    outcome:
+      "PR creating or updating AGENTS.md with build, test and lint commands",
+    agent: "Implementation Agent",
+    needsProfile: false,
+    enabled: false,
+    runs: 0,
+    confirm: "Nothing to ask. It opens one AGENTS.md PR per repository.",
   },
   {
-    name: "Slack health report",
-    why: "Daily summary of the work stream to #factory-ops",
+    name: "@OpenHands mention monitor",
+    catalogId: "github-repo-monitor",
+    phase: "Catalog",
+    schedule: "Every 15 minutes",
+    cron: "*/15 * * * *",
+    trigger:
+      "@OpenHands mentions in issues and PR comments (write access only)",
+    outcome: "Starts a conversation that answers or carries out the request",
     agent: "Factory Coordinator",
+    needsProfile: true,
+    enabled: false,
+    runs: 0,
   },
   {
-    name: "Dependency CVE monitor",
-    why: "2 repositories have no security scanning",
+    name: "Comment cleanup",
+    catalogId: "github-comment-cleanup",
+    phase: "Catalog",
+    schedule: "Mondays 09:00 UTC",
+    cron: "0 9 * * 1",
+    trigger: "Files changed since the last pass",
+    outcome: "One PR per repository removing comments that restate the code",
+    agent: "Implementation Agent",
+    needsProfile: false,
+    enabled: false,
+    runs: 0,
+  },
+  {
+    name: "Daily factory briefing",
+    catalogId: "slack-github-linear-daily-organization",
+    phase: "Catalog",
+    schedule: "Daily 07:00",
+    cron: "0 7 * * *",
+    trigger: "Every morning",
+    outcome:
+      "Reconciles open PRs with Linear issues and posts a daily plan to Slack",
+    agent: "Factory Coordinator",
+    needsProfile: true,
+    enabled: false,
+    runs: 0,
+  },
+  {
+    name: "CVE patcher",
+    catalogId: "github-cve-patcher",
+    phase: "Concept",
+    schedule: "Every hour",
+    cron: "0 * * * *",
+    trigger: "New Dependabot or Trivy alert at high or critical severity",
+    outcome:
+      "Bumps the dependency, runs tests and opens a PR linked to the advisory",
+    agent: "Implementation Agent",
+    needsProfile: true,
+    enabled: false,
+    runs: 0,
+    confirm: "Which severities, and should patch-level bumps skip review?",
+  },
+  {
+    name: "Error to issue",
+    catalogId: "sentry-error-to-issue",
+    phase: "Concept",
+    schedule: "On alert",
+    cron: "webhook",
+    trigger: "New Sentry issue crossing an event-rate threshold",
+    outcome:
+      "Deduplicated GitHub issue with stack trace and reproduction notes, sent to triage",
     agent: "Triage Agent",
+    needsProfile: true,
+    enabled: false,
+    runs: 0,
+    confirm: "Which Sentry projects, and what event rate counts as new work?",
   },
+  {
+    name: "Flaky test quarantine",
+    catalogId: "github-flaky-test-quarantine",
+    phase: "Concept",
+    schedule: "Daily 02:00",
+    cron: "0 2 * * *",
+    trigger: "Tests that failed and then passed on retry in the last 7 days",
+    outcome:
+      "PR that skips the flaky test with a tracking issue, so CI stops blocking the factory",
+    agent: "QA Agent",
+    needsProfile: true,
+    enabled: false,
+    runs: 0,
+    confirm: "How many flaky runs before a test is quarantined?",
+  },
+  {
+    name: "Release notes drafter",
+    catalogId: "github-release-notes",
+    phase: "Concept",
+    schedule: "On release tag",
+    cron: "webhook",
+    trigger: "A new tag or draft release",
+    outcome:
+      "Release notes grouped by feature, fix and breaking change, from merged factory PRs",
+    agent: "Planner",
+    needsProfile: true,
+    enabled: false,
+    runs: 0,
+  },
+];
+
+/** The skill's Tune table, with the defaults it creates stations with. */
+export const FACTORY_SETTINGS: [string, string][] = [
+  ["Ticket source", "GitHub issues"],
+  ["Issue trigger label", "openhands"],
+  ["Draft or ready pull requests", "draft"],
+  ["Branch prefix", "openhands/issue"],
+  ["Which PRs get reviewed", "label openhands-review, reviewer all-hands-bot"],
+  ["Review tone", "concise"],
+  ["Human reviewers after agent approval", "none"],
+  ["Auto-merge", "on, openhands/issue branches only"],
+  ["Stale CI", "warn, then close"],
+  ["QA base branch", "main"],
+  ["Timezone", "UTC"],
 ];
 
 export type RunStatus =
@@ -942,20 +1108,300 @@ export function findRun(id: string | undefined) {
   return RUNS.find((r) => r.id === id) ?? RUNS[0];
 }
 
-export interface BlueprintStage {
-  num: string;
-  name: string;
-  agent: string;
-  gate?: boolean;
+/* ------------------------------------------------------------------ */
+/* Workflows: integrations and stations wired together on a canvas     */
+/* ------------------------------------------------------------------ */
+
+export type WorkflowNodeKind =
+  "integration" | "automation" | "stage" | "gate" | "outcome";
+
+export interface WorkflowNode {
+  id: string;
+  kind: WorkflowNodeKind;
+  label: string;
+  /** Agent for stages; what it provides for integrations; catalog id for automations. */
+  detail: string;
+  x: number;
+  y: number;
+  /** Overrides the default node size (the GitHub connector bar is wide). */
+  w?: number;
+  h?: number;
 }
 
-export const BLUEPRINT_STAGES: BlueprintStage[] = [
-  { num: "01", name: "Triage", agent: "Triage Agent" },
-  { num: "02", name: "Plan", agent: "Planner" },
-  { num: "03", name: "Approval", agent: "Human gate", gate: true },
-  { num: "04", name: "Implement", agent: "Implementation Agent" },
-  { num: "05", name: "Verify", agent: "QA Agent" },
-  { num: "06", name: "Review", agent: "Review Agent" },
+/**
+ * Connection kinds: work hands off between stations, context is read,
+ * notify asks a person, trigger links an integration to the automation that
+ * watches it, runs links an automation to the station it carries out.
+ */
+export type EdgeKind = "work" | "context" | "notify" | "trigger" | "runs";
+
+export interface WorkflowEdge {
+  id: string;
+  from: string;
+  to: string;
+  kind: EdgeKind;
+  /** Short text drawn on the line, e.g. what the automation polls. */
+  label?: string;
+  /** Set when nothing automates this connection yet. */
+  gap?: string;
+}
+
+export const WORKFLOW_NODE_W = 160;
+export const WORKFLOW_NODE_H = 74;
+
+const STAGE_Y = 230;
+const AUTO_Y = 420;
+
+export const WORKFLOW_NODES: WorkflowNode[] = [
+  // Context and notification integrations (top)
+  {
+    id: "notion",
+    kind: "integration",
+    label: "Notion",
+    detail: "Product specs",
+    x: 500,
+    y: 30,
+  },
+  {
+    id: "slack",
+    kind: "integration",
+    label: "Slack",
+    detail: "#factory-ops",
+    x: 720,
+    y: 30,
+  },
+  // Ticket sources without an automation yet (left)
+  {
+    id: "linear",
+    kind: "integration",
+    label: "Linear",
+    detail: "Issues · team ENG",
+    x: 90,
+    y: 150,
+  },
+  {
+    id: "sentry",
+    kind: "integration",
+    label: "Sentry",
+    detail: "Errors",
+    x: 90,
+    y: 290,
+  },
+  // Stations (middle)
+  {
+    id: "triage",
+    kind: "stage",
+    label: "Triage",
+    detail: "Triage Agent",
+    x: 390,
+    y: STAGE_Y,
+  },
+  {
+    id: "plan",
+    kind: "stage",
+    label: "Plan",
+    detail: "Planner",
+    x: 610,
+    y: STAGE_Y,
+  },
+  {
+    id: "approval",
+    kind: "gate",
+    label: "Approval",
+    detail: "Human gate",
+    x: 830,
+    y: STAGE_Y,
+  },
+  {
+    id: "implement",
+    kind: "stage",
+    label: "Implement",
+    detail: "Implementation Agent",
+    x: 1050,
+    y: STAGE_Y,
+  },
+  {
+    id: "qa",
+    kind: "stage",
+    label: "QA",
+    detail: "QA Agent",
+    x: 1270,
+    y: STAGE_Y,
+  },
+  {
+    id: "review",
+    kind: "stage",
+    label: "Review",
+    detail: "Review Agent",
+    x: 1490,
+    y: STAGE_Y,
+  },
+  {
+    id: "merge",
+    kind: "stage",
+    label: "Merge",
+    detail: "Factory Coordinator",
+    x: 1710,
+    y: STAGE_Y,
+  },
+  {
+    id: "shipped",
+    kind: "outcome",
+    label: "Merged PR",
+    detail: "GitHub · main",
+    x: 1930,
+    y: STAGE_Y,
+  },
+  // Automations (software-factory stations)
+  {
+    id: "a-triage",
+    kind: "automation",
+    label: "Issue triage",
+    detail: "github-issue-triage",
+    x: 390,
+    y: AUTO_Y,
+  },
+  {
+    id: "a-issue-to-pr",
+    kind: "automation",
+    label: "Issue to PR",
+    detail: "github-issue-to-pr",
+    x: 1050,
+    y: AUTO_Y,
+  },
+  {
+    id: "a-qa",
+    kind: "automation",
+    label: "QA changes",
+    detail: "qa-changes",
+    x: 1270,
+    y: AUTO_Y,
+  },
+  {
+    id: "a-review",
+    kind: "automation",
+    label: "PR reviewer",
+    detail: "github-pr-reviewer",
+    x: 1490,
+    y: AUTO_Y,
+  },
+  {
+    id: "a-watchdog",
+    kind: "automation",
+    label: "Auto-merge watchdog",
+    detail: "github-delivery-watchdog",
+    x: 1710,
+    y: AUTO_Y,
+  },
+  {
+    id: "a-stale",
+    kind: "automation",
+    label: "Stale-CI PR closer",
+    detail: "github-stale-ci-pr-closer",
+    x: 1930,
+    y: AUTO_Y,
+  },
+  // The code host every automation reads from and writes to (bottom bar)
+  {
+    id: "github",
+    kind: "integration",
+    label: "GitHub",
+    detail: "org/web-app · org/api-service · issues, PRs, CI",
+    x: 90,
+    y: 600,
+    w: 2000,
+    h: 56,
+  },
+];
+
+export const WORKFLOW_EDGES: WorkflowEdge[] = [
+  // Integration ↔ automation
+  {
+    id: "t1",
+    from: "github",
+    to: "a-triage",
+    kind: "trigger",
+    label: "open issues · 5 min",
+  },
+  {
+    id: "t2",
+    from: "github",
+    to: "a-issue-to-pr",
+    kind: "trigger",
+    label: "label openhands · 15 min",
+  },
+  {
+    id: "t3",
+    from: "github",
+    to: "a-qa",
+    kind: "trigger",
+    label: "PR opened · webhook",
+  },
+  {
+    id: "t4",
+    from: "github",
+    to: "a-review",
+    kind: "trigger",
+    label: "PRs to review · 5 min",
+  },
+  {
+    id: "t5",
+    from: "github",
+    to: "a-watchdog",
+    kind: "trigger",
+    label: "green PRs · 5 min",
+  },
+  {
+    id: "t6",
+    from: "github",
+    to: "a-stale",
+    kind: "trigger",
+    label: "failing CI · hourly",
+  },
+  // Automation → station
+  { id: "r1", from: "a-triage", to: "triage", kind: "runs" },
+  { id: "r2", from: "a-issue-to-pr", to: "implement", kind: "runs" },
+  { id: "r3", from: "a-qa", to: "qa", kind: "runs" },
+  { id: "r4", from: "a-review", to: "review", kind: "runs" },
+  { id: "r5", from: "a-watchdog", to: "merge", kind: "runs" },
+  { id: "r6", from: "a-stale", to: "merge", kind: "runs" },
+  // Sources with no automation yet
+  {
+    id: "g1",
+    from: "linear",
+    to: "triage",
+    kind: "work",
+    gap: "No automation reads Linear yet. Add Linear triage assistant or Linear issue to GitHub PR.",
+  },
+  {
+    id: "g2",
+    from: "sentry",
+    to: "triage",
+    kind: "work",
+    gap: "No automation reads Sentry yet. The Error to issue station is a concept.",
+  },
+  // Station flow
+  { id: "w1", from: "triage", to: "plan", kind: "work" },
+  { id: "w2", from: "plan", to: "approval", kind: "work" },
+  { id: "w3", from: "approval", to: "implement", kind: "work" },
+  { id: "w4", from: "implement", to: "qa", kind: "work" },
+  { id: "w5", from: "qa", to: "review", kind: "work" },
+  { id: "w6", from: "review", to: "merge", kind: "work" },
+  { id: "w7", from: "merge", to: "shipped", kind: "work" },
+  // Context and asks
+  { id: "c1", from: "linear", to: "plan", kind: "context" },
+  { id: "c2", from: "github", to: "plan", kind: "context" },
+  { id: "c3", from: "notion", to: "plan", kind: "context" },
+  { id: "c4", from: "slack", to: "plan", kind: "context" },
+  { id: "n1", from: "slack", to: "approval", kind: "notify" },
+];
+
+/** Integrations that can be dropped onto the canvas but aren't there yet. */
+export const AVAILABLE_INTEGRATIONS = [
+  { id: "jira", label: "Jira", detail: "Issues · PLAT" },
+  { id: "gitlab", label: "GitLab", detail: "Issues and MRs" },
+  { id: "confluence", label: "Confluence", detail: "Docs" },
+  { id: "pagerduty", label: "PagerDuty", detail: "Incidents" },
 ];
 
 export const THROUGHPUT = [
@@ -965,7 +1411,7 @@ export const THROUGHPUT = [
 
 export const DEFINITION_FILES = [
   "factory.yaml",
-  "blueprint.yaml",
+  "workflows.yaml",
   "agents/triage.md",
   "agents/implementation.md",
   "automations/pr-review.yaml",
@@ -978,13 +1424,28 @@ repositories:
   - org/web-app
   - org/api-service
 
-blueprint:
-  stages:
-    - triage
-    - plan
-    - implementation
-    - verification
-    - review
+workflows:
+  triage:
+    sources: [github, linear, sentry]
+    automations: [github-issue-triage]
+  plan:
+    from: [triage]
+    context: [linear, github, notion, slack]
+  approval:
+    gate: human
+    asks: [slack]
+  implement:
+    from: [approval]
+    automations: [github-issue-to-pr]
+  review:
+    from: [implement]
+    automations: [github-pr-reviewer]
+  qa:
+    from: [implement]
+    automations: [qa-changes]
+  merge:
+    from: [review, qa]
+    automations: [github-delivery-watchdog, github-stale-ci-pr-closer]
 
 agents:
   - coordinator
